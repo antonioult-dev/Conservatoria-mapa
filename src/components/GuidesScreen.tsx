@@ -26,14 +26,14 @@ import {
   ShieldAlert,
 } from 'lucide-react';
 import { useApp } from '../services/store';
-import { TourGuide, TourSpecialty, PaymentTransaction } from '../types';
+import { TourGuide, TourSpecialty } from '../types';
 
 interface GuidesScreenProps {
   onOpenChatWithPrompt?: (prompt: string) => void;
 }
 
 export const GuidesScreen: React.FC<GuidesScreenProps> = ({ onOpenChatWithPrompt }) => {
-  const { guides, addGuide, createPixPayment, confirmPaymentWebhook, settings } = useApp();
+  const { guides, addGuide, currentUser, loginWithGoogle } = useApp();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSpecialty, setSelectedSpecialty] = useState<string>('all');
@@ -47,9 +47,9 @@ export const GuidesScreen: React.FC<GuidesScreenProps> = ({ onOpenChatWithPrompt
   const [bookingNotes, setBookingNotes] = useState('');
   const [bookingSent, setBookingSent] = useState(false);
 
-  // Guide Registration Modal State (with Monthly Subscription of R$ 49,90)
+  // Guide registration and subscription status
   const [isRegisterGuideOpen, setIsRegisterGuideOpen] = useState(false);
-  const [regStep, setRegStep] = useState<'form' | 'payment' | 'success'>('form');
+  const [regStep, setRegStep] = useState<'form' | 'payment'>('form');
   const [regName, setRegName] = useState('');
   const [regCadastur, setRegCadastur] = useState('');
   const [regPhone, setRegPhone] = useState('');
@@ -57,18 +57,10 @@ export const GuidesScreen: React.FC<GuidesScreenProps> = ({ onOpenChatWithPrompt
   const [regEmail, setRegEmail] = useState('');
   const [regSpecialty, setRegSpecialty] = useState<TourSpecialty>('seresta_historica');
   const [regBio, setRegBio] = useState('');
-  const [regPrice, setRegPrice] = useState('50');
-  const [regDuration, setRegDuration] = useState('2h30');
-  const [regMeetingPoint, setRegMeetingPoint] = useState('Praça da Matriz');
-  const [registeredGuide, setRegisteredGuide] = useState<TourGuide | null>(null);
-  const [pixPaymentData, setPixPaymentData] = useState<PaymentTransaction | null>(null);
-  const [pixCopied, setPixCopied] = useState(false);
-  const [isSimulatingPayment, setIsSimulatingPayment] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<'PIX' | 'CREDIT_CARD'>('PIX');
-  const [cardHolder, setCardHolder] = useState('');
-  const [cardNumber, setCardNumber] = useState('');
-  const [cardExp, setCardExp] = useState('');
-  const [cardCvv, setCardCvv] = useState('');
+  const [regPrice, setRegPrice] = useState('');
+  const [regDuration, setRegDuration] = useState('');
+  const [regMeetingPoint, setRegMeetingPoint] = useState('');
+  const [regError, setRegError] = useState('');
 
   const specialties = [
     { id: 'all', label: 'Todos os Guias' },
@@ -123,10 +115,14 @@ Você tem disponibilidade para esse dia?`;
     }, 1200);
   };
 
-  // Step 1: Submit Form -> Create Guide as PENDING_PAYMENT & Create PIX Transaction
-  const handleProceedToPayment = (e: React.FormEvent) => {
+  // Submit an authenticated guide profile and leave it pending until a real gateway is configured.
+  const handleProceedToPayment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!regName || !regCadastur) return;
+    if (!regName.trim() || !regCadastur.trim() || !regBio.trim() || !Number.isFinite(Number(regPrice)) || Number(regPrice) <= 0) {
+      setRegError('Informe nome, CADASTUR, apresentação e um preço válido para o passeio.');
+      return;
+    }
+    setRegError('');
 
     const specialtyLabels: Record<TourSpecialty, string> = {
       seresta_historica: 'Serestas & Centro Histórico',
@@ -136,79 +132,34 @@ Você tem disponibilidade para esse dia?`;
       gastronomia_cultural: 'Cultura & Gastronomia Típica',
     };
 
-    const newGuide = addGuide({
+    if (!currentUser) {
+      const authResult = await loginWithGoogle('COMERCIANTE');
+      if (!authResult.success) { setRegError(authResult.error || 'Entre com Google para enviar seu cadastro.'); return; }
+    }
+
+    try { await addGuide({
       name: regName,
       cadastur: regCadastur,
-      photoUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=600&q=80',
+      photoUrl: '',
       specialty: regSpecialty,
       specialtyLabel: specialtyLabels[regSpecialty],
-      bio: regBio || 'Guia turístico credenciado pelo Ministério do Turismo em Conservatória.',
-      experienceYears: 5,
-      languages: ['Português'],
+      bio: regBio.trim(),
+      experienceYears: 0,
+      languages: [],
       phone: regPhone,
       whatsapp: regWhatsapp || regPhone,
       email: regEmail,
-      pricePerPerson: parseFloat(regPrice) || 50,
-      duration: regDuration,
-      includedItems: [
-        'Acompanhamento guiado especializado',
-        'História e contexto de Conservatória',
-        'Parada para fotos em locais emblemáticos'
-      ],
-      itineraryHighlights: [
-        'Pontos principais do roteiro escolhido',
-        'Paradas culturais e históricas'
-      ],
-      meetingPoint: regMeetingPoint,
-      availability: 'Sextas, Sábados e Domingos',
+      pricePerPerson: Number(regPrice),
+      duration: regDuration.trim(),
+      includedItems: [],
+      itineraryHighlights: [],
+      meetingPoint: regMeetingPoint.trim(),
+      availability: '',
       status: 'PENDING_PAYMENT',
       monthlySubscriptionPrice: 49.9,
-    });
+    }); } catch (error) { setRegError(error instanceof Error ? error.message : 'Não foi possível salvar o cadastro.'); return; }
 
-    setRegisteredGuide(newGuide);
-
-    // Create PIX transaction for monthly subscription of R$ 49.90
-    const payment = createPixPayment(
-      newGuide.id,
-      `Mensalidade Guia - ${newGuide.name}`,
-      49.9,
-      'GUIDE'
-    );
-    setPixPaymentData(payment);
     setRegStep('payment');
-  };
-
-  // Step 2: Confirm Payment (Simulation or direct confirmation)
-  const handleConfirmGuidePayment = () => {
-    if (!pixPaymentData || !registeredGuide) return;
-    setIsSimulatingPayment(true);
-
-    setTimeout(() => {
-      confirmPaymentWebhook(pixPaymentData.id);
-      setIsSimulatingPayment(false);
-      setRegStep('success');
-
-      setTimeout(() => {
-        setIsRegisterGuideOpen(false);
-        setRegStep('form');
-        // Reset form fields
-        setRegName('');
-        setRegCadastur('');
-        setRegPhone('');
-        setRegWhatsapp('');
-        setRegEmail('');
-        setRegBio('');
-        setPixCopied(false);
-      }, 2500);
-    }, 1200);
-  };
-
-  const handleCopyPix = () => {
-    if (pixPaymentData?.pixCode) {
-      navigator.clipboard.writeText(pixPaymentData.pixCode);
-      setPixCopied(true);
-      setTimeout(() => setPixCopied(false), 2500);
-    }
   };
 
   return (
@@ -219,7 +170,7 @@ Você tem disponibilidade para esse dia?`;
         <div className="relative z-10 space-y-2">
           <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-400/20 text-amber-300 border border-amber-400/30 text-[10px] font-bold uppercase tracking-wider">
             <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
-            <span>Guias Oficiais CADASTUR</span>
+            <span>Perfis de guias</span>
           </div>
 
           <h2 className="text-xl sm:text-2xl font-bold font-serif-header leading-tight">
@@ -227,7 +178,7 @@ Você tem disponibilidade para esse dia?`;
           </h2>
 
           <p className="text-xs text-stone-200 leading-relaxed">
-            Descubra os segredos das serestas, casarios coloniais, fazendas do café e cachoeiras com profissionais locais credenciados.
+            Consulte perfis publicados e confirme credenciais, serviços, preço e disponibilidade diretamente com cada profissional.
           </p>
 
           <div className="pt-1 flex items-center justify-between gap-2 border-t border-white/10 text-[11px] text-stone-300">
@@ -309,11 +260,11 @@ Você tem disponibilidade para esse dia?`;
             >
               {/* Top: Guide Photo, Name, Badge, Rating */}
               <div className="flex items-start gap-3.5">
-                <img
-                  src={guide.photoUrl}
-                  alt={guide.name}
-                  className="w-16 h-16 rounded-2xl object-cover shadow-xs border border-stone-200 flex-shrink-0"
-                />
+                {guide.photoUrl ? (
+                  <img src={guide.photoUrl} alt={guide.name} className="w-16 h-16 rounded-2xl object-cover shadow-xs border border-stone-200 flex-shrink-0" />
+                ) : (
+                  <div aria-label="Foto não cadastrada" className="w-16 h-16 rounded-2xl bg-stone-100 border border-stone-200 flex items-center justify-center text-xl font-bold text-stone-500 flex-shrink-0">{guide.name.slice(0, 1).toUpperCase()}</div>
+                )}
 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-1">
@@ -332,13 +283,13 @@ Você tem disponibilidade para esse dia?`;
                   <div className="flex items-center gap-1.5 flex-wrap mt-1">
                     <span className="inline-flex items-center gap-1 font-mono text-[10px] bg-stone-100 px-1.5 py-0.5 rounded-md text-stone-600">
                       <Award className="w-2.5 h-2.5 text-emerald-700" />
-                      CADASTUR
+                      CADASTUR informado
                     </span>
                     <span className="inline-flex items-center gap-1 font-bold text-[10px] bg-emerald-50 text-emerald-800 border border-emerald-200 px-1.5 py-0.5 rounded-md">
                       <CheckCircle2 className="w-2.5 h-2.5 text-emerald-600" />
-                      Assinante Oficial (R$ 49,90/mês)
+                      Perfil publicado • assinatura de R$ 49,90/mês
                     </span>
-                    <span className="text-[11px] text-stone-400">• {guide.experienceYears} anos exp.</span>
+                    <span className="text-[11px] text-stone-400">• {guide.experienceYears > 0 ? `${guide.experienceYears} anos de experiência` : 'experiência não informada'}</span>
                   </div>
                 </div>
               </div>
@@ -365,8 +316,8 @@ Você tem disponibilidade para esse dia?`;
                 <div>
                   <div className="text-[10px] text-stone-400 uppercase font-bold">Investimento</div>
                   <div className="text-sm font-black text-stone-900">
-                    R$ {guide.pricePerPerson},00{' '}
-                    <span className="text-[10px] font-normal text-stone-500">/ pessoa ({guide.duration})</span>
+                    R$ {guide.pricePerPerson.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}{' '}
+                    <span className="text-[10px] font-normal text-stone-500">/ pessoa{guide.duration ? ` (${guide.duration})` : ''}</span>
                   </div>
                 </div>
 
@@ -403,15 +354,15 @@ Você tem disponibilidade para esse dia?`;
             {/* Header / Close */}
             <div className="flex items-start justify-between pb-2 border-b border-stone-100">
               <div className="flex items-center gap-3">
-                <img
-                  src={selectedGuide.photoUrl}
-                  alt={selectedGuide.name}
-                  className="w-14 h-14 rounded-2xl object-cover border border-stone-200"
-                />
+                {selectedGuide.photoUrl ? (
+                  <img src={selectedGuide.photoUrl} alt={selectedGuide.name} className="w-14 h-14 rounded-2xl object-cover border border-stone-200" />
+                ) : (
+                  <div aria-label="Foto não cadastrada" className="w-14 h-14 rounded-2xl bg-stone-100 border border-stone-200 flex items-center justify-center text-lg font-bold text-stone-500">{selectedGuide.name.slice(0, 1).toUpperCase()}</div>
+                )}
                 <div>
                   <h3 className="text-base font-bold text-stone-900">{selectedGuide.name}</h3>
                   <div className="text-xs text-[#0d3822] font-semibold">{selectedGuide.specialtyLabel}</div>
-                  <div className="text-[10px] text-stone-400 font-mono">Registro CADASTUR: {selectedGuide.cadastur}</div>
+                  <div className="text-[10px] text-stone-400 font-mono">CADASTUR informado: {selectedGuide.cadastur}</div>
                 </div>
               </div>
 
@@ -430,10 +381,10 @@ Você tem disponibilidade para esse dia?`;
                 <span>{selectedGuide.rating.toFixed(1)} estrelas ({selectedGuide.reviewsCount} avaliações)</span>
               </div>
               <div className="bg-stone-100 px-2.5 py-1 rounded-xl text-stone-700 font-semibold">
-                ⏱ Duração: {selectedGuide.duration}
+                ⏱ Duração: {selectedGuide.duration || 'a combinar'}
               </div>
               <div className="bg-emerald-50 text-emerald-900 border border-emerald-200 px-2.5 py-1 rounded-xl font-semibold">
-                🗣 Idiomas: {selectedGuide.languages.join(', ')}
+                🗣 Idiomas: {selectedGuide.languages.length ? selectedGuide.languages.join(', ') : 'a confirmar'}
               </div>
             </div>
 
@@ -459,6 +410,7 @@ Você tem disponibilidade para esse dia?`;
                     <span>{item}</span>
                   </div>
                 ))}
+                {!selectedGuide.includedItems.length && <p className="text-xs text-stone-500">Consulte o guia para confirmar o que está incluído.</p>}
               </div>
             </div>
 
@@ -476,16 +428,17 @@ Você tem disponibilidade para esse dia?`;
                     <span>{stop}</span>
                   </div>
                 ))}
+                {!selectedGuide.itineraryHighlights.length && <p className="text-xs text-stone-500">O roteiro será combinado diretamente com o guia.</p>}
               </div>
             </div>
 
             {/* Meeting Point & Availability */}
             <div className="p-3 rounded-2xl bg-amber-50/70 border border-amber-200 text-xs text-amber-950 space-y-1">
               <div>
-                <span className="font-bold">📍 Ponto de Encontro:</span> {selectedGuide.meetingPoint}
+                <span className="font-bold">📍 Ponto de encontro:</span> {selectedGuide.meetingPoint || 'A combinar diretamente com o guia.'}
               </div>
               <div>
-                <span className="font-bold">🗓 Disponibilidade:</span> {selectedGuide.availability}
+                <span className="font-bold">🗓 Disponibilidade:</span> {selectedGuide.availability || 'Consulte o guia.'}
               </div>
             </div>
 
@@ -494,7 +447,7 @@ Você tem disponibilidade para esse dia?`;
               <div>
                 <div className="text-[10px] text-stone-400 uppercase font-bold">Valor</div>
                 <div className="text-base font-black text-stone-900">
-                  R$ {selectedGuide.pricePerPerson},00{' '}
+                  R$ {selectedGuide.pricePerPerson.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}{' '}
                   <span className="text-[10px] text-stone-500 font-normal">/ pessoa</span>
                 </div>
               </div>
@@ -662,6 +615,7 @@ Você tem disponibilidade para esse dia?`;
             {/* Modal Steps */}
             {regStep === 'form' && (
               <form onSubmit={handleProceedToPayment} className="space-y-3">
+                {regError && <p role="alert" className="rounded-xl bg-red-50 p-3 text-xs text-red-800">{regError}</p>}
                 {/* Subscription Notice */}
                 <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-950 space-y-1.5">
                   <div className="flex items-center justify-between">
@@ -670,12 +624,11 @@ Você tem disponibilidade para esse dia?`;
                       Assinatura Profissional: R$ 49,90 / mês
                     </span>
                     <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-200 text-emerald-800">
-                      0% Comissão
+                      Sem pagamento integrado
                     </span>
                   </div>
                   <p className="text-[11px] text-stone-600 leading-relaxed">
-                    Assim como os comércios locais, os guias credenciados contam com plano mensal fixo de R$ 49,90. 
-                    <strong> 100% do valor dos seus passeios fica integralmente com você.</strong>
+                    O preço comercial é R$ 49,90 por mês. O app ainda não processa pagamentos por passeios nem a assinatura; valores e condições de cada serviço devem ser confirmados diretamente com o profissional.
                   </p>
                 </div>
 
@@ -736,7 +689,7 @@ Você tem disponibilidade para esse dia?`;
                       required
                       value={regWhatsapp}
                       onChange={(e) => setRegWhatsapp(e.target.value)}
-                      placeholder="(24) 99999-9999"
+                      placeholder="(DD) 00000-0000"
                       className="w-full text-xs p-2.5 rounded-xl border border-stone-300 focus:outline-none focus:ring-2 focus:ring-[#0d3822]"
                     />
                   </div>
@@ -765,7 +718,7 @@ Você tem disponibilidade para esse dia?`;
                       type="tel"
                       value={regPhone}
                       onChange={(e) => setRegPhone(e.target.value)}
-                      placeholder="(24) 99999-9999"
+                      placeholder="(DD) 00000-0000"
                       className="w-full text-xs p-2.5 rounded-xl border border-stone-300 focus:outline-none focus:ring-2 focus:ring-[#0d3822]"
                     />
                   </div>
@@ -815,188 +768,25 @@ Você tem disponibilidade para esse dia?`;
                   type="submit"
                   className="w-full py-3 px-4 rounded-xl bg-[#0d3822] hover:bg-[#124b2e] text-white font-bold text-xs shadow-md transition active:scale-95 flex items-center justify-center gap-2"
                 >
-                  <span>Continuar para Assinatura (R$ 49,90/mês)</span>
+                  <span>Enviar cadastro • Assinatura R$ 49,90/mês</span>
                   <ChevronRight className="w-4 h-4 text-amber-300" />
                 </button>
               </form>
             )}
 
-            {/* Step 2: Payment (R$ 49,90) */}
+            {/* Step 2: Payment setup */}
             {regStep === 'payment' && (
               <div className="space-y-4 animate-in fade-in">
-                <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-xs text-amber-950 flex items-center justify-between">
-                  <div>
-                    <span className="font-bold block">Assinatura Mensal de Guia Turístico</span>
-                    <span className="text-[11px] text-stone-500">Validade: 30 dias com renovação mensal</span>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-lg font-black text-amber-900">R$ 49,90</span>
-                    <span className="text-[10px] block text-stone-500">/ mês</span>
-                  </div>
+                {regError && <p role="alert" className="rounded-xl bg-red-50 p-3 text-xs text-red-800">{regError}</p>}
+                <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-xs text-amber-950">
+                  <strong className="block">Assinatura mensal: R$ 49,90</strong>
+                  O pagamento ainda não pode ser concluído: falta configurar um provedor real e sua confirmação segura no servidor. Nenhum PIX ou cobrança foi gerado.
                 </div>
-
-                {/* Payment Methods */}
-                <div className="flex rounded-xl bg-stone-100 p-1 text-xs">
-                  <button
-                    type="button"
-                    onClick={() => setPaymentMethod('PIX')}
-                    className={`flex-1 py-1.5 rounded-lg font-bold transition ${
-                      paymentMethod === 'PIX'
-                        ? 'bg-white text-stone-900 shadow-2xs'
-                        : 'text-stone-500 hover:text-stone-800'
-                    }`}
-                  >
-                    PIX Instantâneo
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPaymentMethod('CREDIT_CARD')}
-                    className={`flex-1 py-1.5 rounded-lg font-bold transition ${
-                      paymentMethod === 'CREDIT_CARD'
-                        ? 'bg-white text-stone-900 shadow-2xs'
-                        : 'text-stone-500 hover:text-stone-800'
-                    }`}
-                  >
-                    Cartão de Crédito
-                  </button>
-                </div>
-
-                {paymentMethod === 'PIX' ? (
-                  <div className="p-4 rounded-2xl bg-stone-50 border border-stone-200 text-center space-y-3">
-                    <div className="text-xs text-stone-700">
-                      Escaneie o QR Code abaixo ou utilize o <strong>PIX Copia e Cola</strong>:
-                    </div>
-
-                    {pixPaymentData?.pixQrCodeUrl ? (
-                      <div className="inline-block p-2 bg-white rounded-2xl shadow-2xs border border-stone-200">
-                        <img
-                          src={pixPaymentData.pixQrCodeUrl}
-                          alt="QR Code PIX R$ 49,90"
-                          className="w-36 h-36 mx-auto"
-                        />
-                      </div>
-                    ) : (
-                      <div className="w-36 h-36 mx-auto bg-stone-200 rounded-2xl flex items-center justify-center text-xs text-stone-500">
-                        QR Code PIX
-                      </div>
-                    )}
-
-                    <div className="text-[11px] text-stone-500">
-                      Chave oficial: <strong>horizonteverdepousada@gmail.com</strong>
-                    </div>
-
-                    <div className="space-y-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (pixPaymentData?.pixCode) {
-                            navigator.clipboard.writeText(pixPaymentData.pixCode);
-                            setPixCopied(true);
-                            setTimeout(() => setPixCopied(false), 2000);
-                          }
-                        }}
-                        className="w-full py-2.5 px-3 rounded-xl bg-white hover:bg-stone-100 border border-stone-300 text-stone-800 font-bold text-xs flex items-center justify-center gap-1.5 transition active:scale-95"
-                      >
-                        <Copy className="w-3.5 h-3.5 text-stone-600" />
-                        <span>{pixCopied ? '✓ Código PIX Copiado!' : 'Copiar Código PIX (R$ 49,90)'}</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        disabled={isSimulatingPayment}
-                        onClick={handleConfirmGuidePayment}
-                        className="w-full py-3 px-4 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white font-bold text-xs shadow-md transition active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50"
-                      >
-                        <Check className="w-4 h-4" />
-                        <span>{isSimulatingPayment ? 'Processando confirmação...' : 'Confirmar Pagamento Realizado'}</span>
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-3 p-3.5 rounded-2xl bg-stone-50 border border-stone-200">
-                    <div>
-                      <label className="block text-[11px] font-bold text-stone-700 mb-1">Nome no Cartão</label>
-                      <input
-                        type="text"
-                        value={cardHolder}
-                        onChange={(e) => setCardHolder(e.target.value)}
-                        placeholder="Nome impresso no cartão"
-                        className="w-full text-xs p-2.5 rounded-xl border border-stone-300 bg-white"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[11px] font-bold text-stone-700 mb-1">Número do Cartão</label>
-                      <input
-                        type="text"
-                        value={cardNumber}
-                        onChange={(e) => setCardNumber(e.target.value)}
-                        placeholder="0000 0000 0000 0000"
-                        className="w-full text-xs p-2.5 rounded-xl border border-stone-300 bg-white"
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="block text-[11px] font-bold text-stone-700 mb-1">Validade</label>
-                        <input
-                          type="text"
-                          value={cardExp}
-                          onChange={(e) => setCardExp(e.target.value)}
-                          placeholder="MM/AA"
-                          className="w-full text-xs p-2.5 rounded-xl border border-stone-300 bg-white"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[11px] font-bold text-stone-700 mb-1">CVV</label>
-                        <input
-                          type="text"
-                          value={cardCvv}
-                          onChange={(e) => setCardCvv(e.target.value)}
-                          placeholder="123"
-                          className="w-full text-xs p-2.5 rounded-xl border border-stone-300 bg-white"
-                        />
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      disabled={isSimulatingPayment}
-                      onClick={handleConfirmGuidePayment}
-                      className="w-full py-3 px-4 rounded-xl bg-[#0d3822] hover:bg-[#124b2e] text-white font-bold text-xs shadow-md transition active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50"
-                    >
-                      <CreditCard className="w-4 h-4 text-amber-300" />
-                      <span>{isSimulatingPayment ? 'Processando Assinatura...' : 'Assinar R$ 49,90 / mês'}</span>
-                    </button>
-                  </div>
-                )}
-
-                <button
-                  type="button"
-                  onClick={() => setRegStep('form')}
-                  className="w-full text-center text-xs text-stone-500 hover:text-stone-800 font-medium py-1"
-                >
+                <button type="button" onClick={() => setRegStep('form')} className="w-full text-center text-xs text-stone-500 hover:text-stone-800 font-medium py-1">
                   ← Voltar e editar dados do guia
                 </button>
               </div>
             )}
-
-            {/* Step 3: Success */}
-            {regStep === 'success' && (
-              <div className="text-center py-6 space-y-3 animate-in fade-in">
-                <div className="w-14 h-14 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto">
-                  <CheckCircle2 className="w-8 h-8" />
-                </div>
-                <h3 className="text-base font-bold text-stone-900">
-                  Assinatura Confirmada com Sucesso!
-                </h3>
-                <p className="text-xs text-stone-600 max-w-sm mx-auto leading-relaxed">
-                  Parabéns! Seu perfil de Guia Credenciado já está ativo e com destaque na aba oficial de Guias de Conservatória.
-                </p>
-                <div className="p-3 rounded-xl bg-stone-100 text-[11px] text-stone-600 font-mono">
-                  Plano: Mensal (R$ 49,90) • Ativo por 30 dias
-                </div>
-              </div>
-            )}
-
           </div>
         </div>
       )}

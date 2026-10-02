@@ -31,7 +31,6 @@ interface AdminPanelProps {
 export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToApp, onOpenDetails }) => {
   const {
     currentUser,
-    login,
     loginWithGoogle,
     logout,
     places,
@@ -56,9 +55,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToApp, onOpenDetai
   } = useApp();
 
   // Login form state if not authenticated as SUPER_ADMIN
-  const [adminEmail, setAdminEmail] = useState('horizonteverdepousada@gmail.com');
-  const [adminPass, setAdminPass] = useState('');
   const [loginError, setLoginError] = useState('');
+  const [placeFormError, setPlaceFormError] = useState('');
 
   // Active admin tab
   const [activeTab, setActiveTab] = useState<
@@ -72,10 +70,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToApp, onOpenDetai
   const [formCategory, setFormCategory] = useState<Place['category']>('historico');
   const [formType, setFormType] = useState<Place['type']>('tourist');
   const [formDescription, setFormDescription] = useState('');
-  const [formAddress, setFormAddress] = useState('Conservatória - RJ');
-  const [formHours, setFormHours] = useState('Segunda a Domingo: 09h às 18h');
-  const [formLat, setFormLat] = useState(-22.31644);
-  const [formLng, setFormLng] = useState(-43.81552);
+  const [formAddress, setFormAddress] = useState('');
+  const [formHours, setFormHours] = useState('');
+  const [formLat, setFormLat] = useState<number | undefined>(undefined);
+  const [formLng, setFormLng] = useState<number | undefined>(undefined);
+  const [formCoordinateSourceUrl, setFormCoordinateSourceUrl] = useState('');
   const [formImageUrl, setFormImageUrl] = useState('');
   const [formPhone, setFormPhone] = useState('');
   const [formWhatsapp, setFormWhatsapp] = useState('');
@@ -85,15 +84,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToApp, onOpenDetai
 
   // Settings form state
   const [appName, setAppName] = useState(settings.appName);
-  const [commercialPrice, setCommercialPrice] = useState(settings.commercialPrice);
   const [bannerHeadline, setBannerHeadline] = useState(settings.bannerHeadline);
   const [bannerSubtext, setBannerSubtext] = useState(settings.bannerSubtext);
   const [savedSettingsSuccess, setSavedSettingsSuccess] = useState(false);
 
-  const isSuperAdmin = currentUser?.role === 'SUPER_ADMIN' && (
-    currentUser?.email.toLowerCase() === 'horizonteverdepousada@gmail.com' ||
-    currentUser?.email.toLowerCase() === 'antoniou.lt@gmail.com'
-  );
+  const isSuperAdmin = currentUser?.role === 'SUPER_ADMIN';
 
   const handleAdminGoogleLogin = async () => {
     setLoginError('');
@@ -101,29 +96,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToApp, onOpenDetai
     if (!res.success) {
       setLoginError(res.error || 'Falha ao autenticar com o Google.');
     } else {
-      const email = res.user?.email.toLowerCase();
-      if (email !== 'horizonteverdepousada@gmail.com' && email !== 'antoniou.lt@gmail.com') {
-        setLoginError('A conta Google conectada não possui privilégios de Administrador Geral.');
-      }
-    }
-  };
-
-  const handleAdminLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const email = adminEmail.trim().toLowerCase();
-    if (email !== 'horizonteverdepousada@gmail.com' && email !== 'antoniou.lt@gmail.com') {
-      setLoginError('Apenas o e-mail oficial do SUPER_ADMIN possui permissão de acesso.');
-      return;
-    }
-    if (adminPass !== '81216610Lm.' && adminPass !== '123456') {
-      setLoginError('Senha incorreta do Super Administrador.');
-      return;
-    }
-    const res = await login(adminEmail, adminPass);
-    if (!res.success) {
-      setLoginError(res.error || 'Credenciais inválidas.');
-    } else {
-      setLoginError('');
+      if (res.user?.role !== 'SUPER_ADMIN') setLoginError('A conta conectada não possui autorização administrativa validada pelo servidor.');
     }
   };
 
@@ -148,7 +121,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToApp, onOpenDetai
             </p>
           </div>
 
-          <form onSubmit={handleAdminLogin} className="space-y-3 pt-2">
+          <div className="space-y-3 pt-2">
             {/* Google Sign-in for Super Admin */}
             <button
               type="button"
@@ -161,55 +134,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToApp, onOpenDetai
                 <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
                 <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
               </svg>
-              <span>Entrar com a Conta Google Oficial</span>
-            </button>
-
-            <div className="relative flex items-center justify-center my-1">
-              <div className="border-t border-stone-800 w-full" />
-              <span className="bg-stone-900 px-2 text-[10px] uppercase font-bold text-stone-500 absolute">
-                ou com e-mail e senha
-              </span>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-stone-300 mb-1">
-                E-mail do Administrador Principal
-              </label>
-              <input
-                type="email"
-                required
-                value={adminEmail}
-                onChange={(e) => setAdminEmail(e.target.value)}
-                placeholder="horizonteverdepousada@gmail.com"
-                className="w-full text-xs p-3 rounded-xl bg-stone-800 border border-stone-700 text-white focus:outline-none focus:ring-2 focus:ring-amber-400"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-stone-300 mb-1">
-                Senha de Acesso
-              </label>
-              <input
-                type="password"
-                required
-                value={adminPass}
-                onChange={(e) => setAdminPass(e.target.value)}
-                placeholder="Digite sua senha..."
-                className="w-full text-xs p-3 rounded-xl bg-stone-800 border border-stone-700 text-white focus:outline-none focus:ring-2 focus:ring-amber-400"
-              />
-            </div>
-
-            {loginError && (
-              <div className="p-2.5 rounded-xl bg-red-950/80 border border-red-800 text-red-300 text-xs font-semibold">
-                {loginError}
-              </div>
-            )}
-
-            <button
-              type="submit"
-              className="w-full py-3.5 px-4 rounded-xl bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold text-xs tracking-wide shadow-md transition active:scale-95"
-            >
-              ENTRAR COMO SUPER_ADMIN
+              <span>Entrar com Google autorizado</span>
             </button>
 
             <button
@@ -219,7 +144,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToApp, onOpenDetai
             >
               Voltar ao Aplicativo Turístico
             </button>
-          </form>
+          </div>
         </div>
       </div>
     );
@@ -229,16 +154,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToApp, onOpenDetai
   const totalBusinesses = places.filter((p) => p.type === 'business' || p.merchantId);
   const activeBusinesses = totalBusinesses.filter((p) => p.status === 'ACTIVE');
   const pendingApprovalBusinesses = totalBusinesses.filter((p) => p.status === 'PENDING_APPROVAL');
-  const pendingPaymentBusinesses = totalBusinesses.filter((p) => p.status === 'PENDING_PAYMENT');
   const expiredBusinesses = totalBusinesses.filter((p) => p.status === 'EXPIRED');
 
   const touristSpotsCount = places.filter((p) => p.type === 'tourist').length;
   const innsCount = places.filter((p) => p.category === 'pousadas').length;
   const restaurantsCount = places.filter((p) => p.category === 'gastronomia').length;
-
-  const totalRevenue = payments
-    .filter((p) => p.status === 'CONFIRMED')
-    .reduce((sum, p) => sum + p.amount, 0);
 
   const pendingReportsCount = reports.filter((r) => !r.resolved).length;
 
@@ -254,6 +174,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToApp, onOpenDetai
       setFormHours(place.hours);
       setFormLat(place.latitude);
       setFormLng(place.longitude);
+      setFormCoordinateSourceUrl(place.coordinateSourceUrl || '');
       setFormImageUrl(place.imageUrl);
       setFormPhone(place.phone || '');
       setFormWhatsapp(place.whatsapp || '');
@@ -266,34 +187,48 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToApp, onOpenDetai
       setFormCategory('historico');
       setFormType('tourist');
       setFormDescription('');
-      setFormAddress('Conservatória - RJ');
-      setFormHours('Segunda a Domingo: 09h às 18h');
-      setFormLat(-22.31644);
-      setFormLng(-43.81552);
-      setFormImageUrl('https://images.unsplash.com/photo-1549421263-5ec394a5ad4c?auto=format&fit=crop&w=900&q=80');
+      setFormAddress('');
+      setFormHours('');
+      setFormLat(undefined);
+      setFormLng(undefined);
+      setFormCoordinateSourceUrl('');
+      setFormImageUrl('');
       setFormPhone('');
       setFormWhatsapp('');
       setFormFeatured(false);
-      setFormVerified(true);
+      setFormVerified(false);
       setFormStatus('ACTIVE');
     }
     setShowPlaceForm(true);
   };
 
-  const handleSavePlace = (e: React.FormEvent) => {
+  const handleSavePlace = async (e: React.FormEvent) => {
     e.preventDefault();
+    setPlaceFormError('');
     if (!formName.trim()) return;
+    const hasCoordinates = Number.isFinite(formLat) && Number.isFinite(formLng)
+      && formLat! >= -90 && formLat! <= 90 && formLng! >= -180 && formLng! <= 180;
+    let verifiedCoordinateSource = false;
+    try { verifiedCoordinateSource = new URL(formCoordinateSourceUrl).protocol === 'https:'; } catch { /* source absent or invalid */ }
+    if ((formLat !== undefined || formLng !== undefined) && !hasCoordinates) {
+      setPlaceFormError('Informe latitude e longitude válidas em conjunto.'); return;
+    }
+    if (hasCoordinates && !verifiedCoordinateSource) {
+      setPlaceFormError('Para publicar coordenadas no mapa, informe uma fonte https verificável.'); return;
+    }
 
+    try {
     if (editingPlaceId) {
-      updatePlace(editingPlaceId, {
+      await updatePlace(editingPlaceId, {
         name: formName,
         category: formCategory,
         type: formType,
         description: formDescription,
         address: formAddress,
         hours: formHours,
-        latitude: parseFloat(formLat as any),
-        longitude: parseFloat(formLng as any),
+        ...(hasCoordinates ? { latitude: formLat, longitude: formLng } : { latitude: undefined, longitude: undefined }),
+        coordinatesVerified: hasCoordinates && verifiedCoordinateSource,
+        coordinateSourceUrl: verifiedCoordinateSource ? formCoordinateSourceUrl : '',
         imageUrl: formImageUrl,
         phone: formPhone,
         whatsapp: formWhatsapp,
@@ -302,7 +237,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToApp, onOpenDetai
         status: formStatus,
       });
     } else {
-      addPlace({
+      await addPlace({
         name: formName,
         category: formCategory,
         categoryLabel: formCategory.toUpperCase(),
@@ -311,33 +246,36 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToApp, onOpenDetai
         shortDescription: formDescription.slice(0, 100),
         address: formAddress,
         hours: formHours,
-        latitude: parseFloat(formLat as any),
-        longitude: parseFloat(formLng as any),
+        ...(hasCoordinates ? { latitude: formLat, longitude: formLng } : {}),
+        coordinatesVerified: hasCoordinates && verifiedCoordinateSource,
+        coordinateSourceUrl: verifiedCoordinateSource ? formCoordinateSourceUrl : '',
         imageUrl: formImageUrl,
-        gallery: [formImageUrl],
+        gallery: formImageUrl.trim() ? [formImageUrl.trim()] : [],
         phone: formPhone,
         whatsapp: formWhatsapp,
         featured: formFeatured,
         verified: formVerified,
-        rating: 5.0,
+        rating: 0,
         reviewCount: 0,
         status: formStatus,
       });
     }
-
+    } catch (error) {
+      setPlaceFormError(error instanceof Error ? error.message : 'Não foi possível salvar o local.');
+      return;
+    }
     setShowPlaceForm(false);
   };
 
-  const handleSaveSettings = (e: React.FormEvent) => {
+  const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
-    updateSettings({
-      appName,
-      commercialPrice: parseFloat(commercialPrice as any),
-      bannerHeadline,
-      bannerSubtext,
-    });
-    setSavedSettingsSuccess(true);
-    setTimeout(() => setSavedSettingsSuccess(false), 2500);
+    try {
+      await updateSettings({ appName, bannerHeadline, bannerSubtext });
+      setSavedSettingsSuccess(true);
+      setTimeout(() => setSavedSettingsSuccess(false), 2500);
+    } catch (error) {
+      setLoginError(error instanceof Error ? error.message : 'Não foi possível salvar as configurações.');
+    }
   };
 
   return (
@@ -401,11 +339,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToApp, onOpenDetai
           {/* Revenue & Overview KPIs */}
           <div className="grid grid-cols-2 gap-2.5">
             <div className="p-3.5 rounded-2xl bg-white border border-stone-200 shadow-2xs">
-              <span className="text-[10px] font-bold text-stone-500 uppercase">Receita Confirmada</span>
-              <div className="text-xl font-black text-emerald-800 mt-0.5">
-                R$ {totalRevenue.toFixed(2)}
+              <span className="text-[10px] font-bold text-stone-500 uppercase">Pagamentos</span>
+              <div className="text-sm font-black text-stone-700 mt-2">
+                Indisponíveis
               </div>
-              <span className="text-[10px] text-stone-400">Total arrecadado</span>
+              <span className="text-[10px] text-stone-400">Gateway não configurado</span>
             </div>
 
             <div className="p-3.5 rounded-2xl bg-white border border-stone-200 shadow-2xs">
@@ -421,7 +359,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToApp, onOpenDetai
               <div className="text-xl font-black text-amber-600 mt-0.5">
                 {pendingApprovalBusinesses.length}
               </div>
-              <span className="text-[10px] text-stone-400">Pagamento confirmado</span>
+              <span className="text-[10px] text-stone-400">Cadastros enviados</span>
             </div>
 
             <div className="p-3.5 rounded-2xl bg-white border border-stone-200 shadow-2xs">
@@ -438,7 +376,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToApp, onOpenDetai
             <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 space-y-2">
               <div className="flex items-center gap-2 text-xs font-bold text-amber-900">
                 <BellRing className="w-4 h-4 text-amber-600 animate-bounce" />
-                <span>Existem estabelecimentos pagos aguardando aprovação:</span>
+                <span>Existem cadastros aguardando aprovação:</span>
               </div>
               <div className="space-y-1.5">
                 {pendingApprovalBusinesses.map((b) => (
@@ -579,7 +517,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToApp, onOpenDetai
                 Guias de Turismo Cadastrados ({guides.length})
               </h3>
               <p className="text-xs text-stone-500">
-                Assinatura mensal: R$ 49,90/mês • Credenciamento CADASTUR
+                Preço informado: R$ 49,90/mês • número CADASTUR sujeito à revisão
               </p>
             </div>
           </div>
@@ -611,14 +549,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToApp, onOpenDetai
                             ? 'Ativo'
                             : guide.status === 'PENDING_APPROVAL'
                             ? 'Aguardando Aprovação'
-                            : 'Aguardando Pagamento'}
+                            : 'Cobrança não configurada'}
                         </span>
                       </div>
                       <div className="text-[11px] text-stone-500">
-                        CADASTUR: {guide.cadastur} • {guide.specialtyLabel}
+                        CADASTUR informado: {guide.cadastur} • {guide.specialtyLabel}
                       </div>
                       <div className="text-[11px] text-emerald-800 font-semibold mt-0.5">
-                        Mensalidade: R$ {guide.monthlySubscriptionPrice || 49.9},00/mês • WhatsApp: {guide.whatsapp}
+                        Mensalidade: R$ 49,90/mês • WhatsApp: {guide.whatsapp}
                       </div>
                     </div>
                   </div>
@@ -712,7 +650,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToApp, onOpenDetai
 
           {payments.length === 0 ? (
             <div className="p-6 rounded-2xl bg-white border border-stone-200 text-center text-xs text-stone-500">
-              Nenhuma transação registrada até o momento.
+              Pagamentos não estão integrados a um provedor. Nenhum pagamento pode ser criado ou confirmado por este painel.
             </div>
           ) : (
             <div className="space-y-2">
@@ -761,13 +699,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToApp, onOpenDetai
               <label className="block text-xs font-bold text-stone-700 mb-1">
                 Valor do Anúncio Comercial Mensal (R$/mês):
               </label>
-              <input
-                type="number"
-                step="0.01"
-                value={commercialPrice}
-                onChange={(e) => setCommercialPrice(parseFloat(e.target.value))}
-                className="w-full text-xs p-2.5 rounded-xl border border-stone-300"
-              />
+              <div className="w-full text-xs p-2.5 rounded-xl border border-stone-200 bg-stone-100 text-stone-700">
+                R$ 49,90 (preço oficial)
+              </div>
             </div>
 
             <div>
@@ -814,6 +748,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToApp, onOpenDetai
       {showPlaceForm && (
         <div className="fixed inset-0 z-60 flex items-center justify-center p-3 bg-black/70 backdrop-blur-xs">
           <form onSubmit={handleSavePlace} className="w-full max-w-md max-h-[90vh] overflow-y-auto bg-white rounded-3xl p-5 shadow-2xl border border-stone-200 space-y-3">
+            {placeFormError && <p role="alert" className="text-xs text-red-700">{placeFormError}</p>}
             <div className="flex items-center justify-between pb-2 border-b border-stone-100">
               <h4 className="text-base font-bold text-stone-900">
                 {editingPlaceId ? 'Editar Local' : 'Novo Ponto Turístico'}
@@ -900,8 +835,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToApp, onOpenDetai
                   <input
                     type="number"
                     step="any"
-                    value={formLat}
-                    onChange={(e) => setFormLat(parseFloat(e.target.value))}
+                    value={formLat ?? ''}
+                    onChange={(e) => setFormLat(e.target.value === '' ? undefined : parseFloat(e.target.value))}
                     className="w-full p-2 rounded-xl border border-stone-300 mt-1"
                   />
                 </div>
@@ -910,11 +845,23 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToApp, onOpenDetai
                   <input
                     type="number"
                     step="any"
-                    value={formLng}
-                    onChange={(e) => setFormLng(parseFloat(e.target.value))}
+                    value={formLng ?? ''}
+                    onChange={(e) => setFormLng(e.target.value === '' ? undefined : parseFloat(e.target.value))}
                     className="w-full p-2 rounded-xl border border-stone-300 mt-1"
                   />
                 </div>
+              </div>
+
+              <div>
+                <label className="font-bold text-stone-700">Fonte pública das coordenadas (HTTPS):</label>
+                <input
+                  type="url"
+                  value={formCoordinateSourceUrl}
+                  onChange={(e) => setFormCoordinateSourceUrl(e.target.value)}
+                  placeholder="https://fonte-oficial.example/local"
+                  className="w-full p-2 rounded-xl border border-stone-300 mt-1"
+                />
+                <p className="text-[10px] text-stone-500 mt-1">Coordenadas sem fonte ficam fora do mapa e não geram rotas ou distâncias.</p>
               </div>
 
               <div>
@@ -950,7 +897,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToApp, onOpenDetai
                     className="w-4 h-4 text-emerald-700 rounded"
                   />
                   <label htmlFor="chkVerified" className="font-bold text-stone-700">
-                    Coordenadas & Localização Verificadas Oficialmente
+                    Informações do cadastro conferidas
                   </label>
                 </div>
 

@@ -28,8 +28,10 @@ export interface Place {
   shortDescription?: string;
   imageUrl: string;
   gallery: string[];
-  latitude: number;
-  longitude: number;
+  latitude?: number;
+  longitude?: number;
+  coordinatesVerified?: boolean;
+  coordinateSourceUrl?: string;
   address: string;
   hours: string;
   phone?: string;
@@ -79,6 +81,7 @@ export interface TouristRoute {
 export interface Review {
   id: string;
   placeId: string;
+  userId: string;
   userName: string;
   rating: number;
   comment: string;
@@ -89,6 +92,7 @@ export interface Review {
 export interface Report {
   id: string;
   placeId: string;
+  userId: string;
   placeName: string;
   reason: 'endereco_errado' | 'negocio_inexistente' | 'informacao_incorreta' | 'conteudo_inadequado' | 'outro';
   reasonLabel: string;

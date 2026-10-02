@@ -3,13 +3,19 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "packageManager": "pnpm@9.15.5",
+  "engines": {
+    "node": ">=22.18.0"
+  },
   "scripts": {
     "dev": "tsx server.ts",
-    "build": "vite build",
-    "start": "tsx server.ts",
+    "build": "vite build --configLoader native",
+    "build:vercel": "node scripts/vercel-build.mjs",
+    "start": "node server.ts",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "deploy:firestore:rules": "firebase deploy --only firestore:ai-studio-conservatriaturi-e532106b-c35e-41a9-9c4f-3fc305c9f65b"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
@@ -18,6 +24,7 @@
     "dotenv": "^17.2.3",
     "express": "^4.21.2",
     "firebase": "^12.19.0",
+    "firebase-admin": "^14.5.0",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.546.0",
     "motion": "^12.23.24",

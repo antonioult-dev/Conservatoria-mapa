@@ -1,12 +1,14 @@
 import React from 'react';
 import { X, MapPin, Navigation, Star, Search, Compass, AlertCircle } from 'lucide-react';
-import { Place } from '../types';
-import { calculateDistance, formatDistance } from '../services/store';
+import { Place, Review } from '../types';
+import { calculateDistance, formatDistance, getReviewSummary } from '../services/store';
+import { hasVerifiedCoordinates } from '../utils/location';
 
 interface PlacesListDrawerProps {
   isOpen: boolean;
   onClose: () => void;
   places: Place[];
+  reviews: Review[];
   selectedPlaceId?: string;
   onSelectPlace: (place: Place) => void;
   userLocation: { lat: number; lng: number } | null;
@@ -17,6 +19,7 @@ export const PlacesListDrawer: React.FC<PlacesListDrawerProps> = ({
   isOpen,
   onClose,
   places,
+  reviews,
   selectedPlaceId,
   onSelectPlace,
   userLocation,
@@ -73,10 +76,11 @@ export const PlacesListDrawer: React.FC<PlacesListDrawerProps> = ({
           ) : (
             places.map((place) => {
               const isSelected = selectedPlaceId === place.id;
-              const hasCoordinates = typeof place.latitude === 'number' && typeof place.longitude === 'number' && !isNaN(place.latitude) && !isNaN(place.longitude);
+              const hasCoordinates = hasVerifiedCoordinates(place);
               const distanceMeters = userLocation && hasCoordinates
                 ? calculateDistance(userLocation.lat, userLocation.lng, place.latitude, place.longitude)
                 : null;
+              const rating = getReviewSummary(reviews, place.id);
 
               return (
                 <div
@@ -108,7 +112,7 @@ export const PlacesListDrawer: React.FC<PlacesListDrawerProps> = ({
 
                   {/* Info */}
                   <div className="flex-1 min-w-0 space-y-0.5">
-                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <div className="flex items-center gap-1.5 flex-wrap">
                       <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800 bg-emerald-50 px-1.5 py-0.2 rounded">
                         {place.categoryLabel || place.category}
                       </span>
@@ -117,6 +121,7 @@ export const PlacesListDrawer: React.FC<PlacesListDrawerProps> = ({
                           {place.patrimonyYear}
                         </span>
                       )}
+                      {rating.rating !== null && <span className="text-[10px] font-bold text-amber-700">★ {rating.rating.toFixed(1)} ({rating.count})</span>}
                     </div>
 
                     <h4 className="text-sm font-bold text-stone-900 truncate">
@@ -154,7 +159,7 @@ export const PlacesListDrawer: React.FC<PlacesListDrawerProps> = ({
 
         {/* Footer */}
         <div className="p-3 bg-stone-50 border-t border-stone-200 text-center text-xs text-stone-500 flex-shrink-0">
-          Toque em qualquer local para localizá-lo e ver a rota no mapa.
+          Toque em um local para ver os detalhes e a localização disponível no mapa.
         </div>
       </div>
     </div>

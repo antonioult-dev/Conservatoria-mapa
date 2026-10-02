@@ -87,7 +87,7 @@ export const EmergencyModal: React.FC<EmergencyModalProps> = ({ isOpen, onClose 
         <div className="mt-3.5 p-3 rounded-2xl bg-stone-800/80 border border-stone-700/60 flex items-start gap-2.5 text-xs text-stone-300">
           <Info className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
           <div>
-            <span className="font-semibold text-white">Disponível sem internet:</span> Os botões abaixo abrem o discador oficial do seu aparelho celular. As ligações para serviços de emergência pública são 100% gratuitas em qualquer operadora.
+            <span className="font-semibold text-white">Não exige internet do app:</span> Os botões abrem o discador do aparelho. A ligação ainda depende de sinal móvel e disponibilidade da rede telefônica.
           </div>
         </div>
 
@@ -222,23 +222,6 @@ export const EmergencyModal: React.FC<EmergencyModalProps> = ({ isOpen, onClose 
               <Phone className="w-4 h-4" />
             </div>
           </a>
-        </div>
-
-        {/* Local Valença / Conservatória Support Contacts */}
-        <div className="mt-4 p-3.5 rounded-2xl bg-stone-800/60 border border-stone-700">
-          <div className="text-xs font-bold text-stone-300 uppercase tracking-wider mb-2">
-            Postos Oficiais na Região de Conservatória:
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-stone-300">
-            <div className="flex items-center justify-between p-2 rounded-xl bg-stone-900/60">
-              <span>DPO Conservatória (Polícia Local)</span>
-              <a href="tel:2424381200" className="font-bold text-blue-400 hover:underline">(24) 2438-1200</a>
-            </div>
-            <div className="flex items-center justify-between p-2 rounded-xl bg-stone-900/60">
-              <span>Posto de Saúde Conservatória</span>
-              <a href="tel:2424381310" className="font-bold text-emerald-400 hover:underline">(24) 2438-1310</a>
-            </div>
-          </div>
         </div>
 
         {/* Situations Guidance */}

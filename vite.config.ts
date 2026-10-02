@@ -1,14 +1,33 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
+import { fileURLToPath } from 'node:url';
 import {defineConfig} from 'vite';
+
+const projectRoot = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig(() => {
   return {
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
-        '@': path.resolve(__dirname, '.'),
+        '@': projectRoot,
+      },
+    },
+    build: {
+      rolldownOptions: {
+        output: {
+          codeSplitting: {
+            minSize: 20_000,
+            groups: [
+              { name: 'firebase-auth', test: /[\\/]node_modules[\\/](?:firebase[\\/]auth|@firebase[\\/]auth)(?:[\\/]|$)/ },
+              { name: 'firebase-firestore', test: /[\\/]node_modules[\\/](?:firebase[\\/]firestore|@firebase[\\/]firestore)(?:[\\/]|$)/ },
+              { name: 'firebase', test: /[\\/]node_modules[\\/](?:firebase|@firebase)[\\/]/ },
+              { name: 'react-vendor', test: /[\\/]node_modules[\\/](?:react|react-dom|scheduler)[\\/]/ },
+              { name: 'map-vendor', test: /[\\/]node_modules[\\/]leaflet[\\/]/ },
+            ],
+          },
+        },
       },
     },
     server: {

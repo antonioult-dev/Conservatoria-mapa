@@ -86,10 +86,10 @@ export const LegalModal: React.FC<LegalModalProps> = ({
               <section className="space-y-1">
                 <h4 className="font-bold text-stone-900 text-sm">2. Cadastro de Comércios e Guias de Turismo</h4>
                 <p>
-                  Estabelecimentos comerciais (pousadas, restaurantes, lojas e serviços) e guias de turismo cadastrados participam mediante adesão voluntária a planos de divulgação (com mensalidade a partir de R$ 29,90, sujeita à parametrização da administração).
+                  Estabelecimentos comerciais (pousadas, restaurantes, lojas e serviços) e guias podem solicitar um plano de divulgação com preço oficial de R$ 49,90 por mês. O aplicativo ainda não cobra essa mensalidade; a ativação depende de integração real de pagamentos.
                 </p>
                 <p>
-                  O aplicativo não cobra comissão sobre passeios ou reservas diretas realizadas entre turistas e prestadores de serviços, atuando exclusivamente como vitrine digital e facilitador de contato.
+                  O aplicativo não processa reservas nem pagamentos de passeios. Turistas e prestadores devem confirmar preço, disponibilidade e condições diretamente entre si.
                 </p>
               </section>
 
@@ -140,7 +140,7 @@ export const LegalModal: React.FC<LegalModalProps> = ({
               <section className="space-y-1">
                 <h4 className="font-bold text-stone-900 text-sm">4. Direitos do Titular</h4>
                 <p>
-                  O titular dos dados poderá solicitar a qualquer momento a confirmação, correção ou exclusão de seus dados cadastrais enviando solicitação através do canal oficial de suporte via Gmail integrado no aplicativo ou para o e-mail: <strong>horizonteverdepousada@gmail.com</strong>.
+                  O titular dos dados poderá solicitar a qualquer momento a confirmação, correção ou exclusão de seus dados cadastrais pelo canal de suporte exibido no aplicativo, quando configurado.
                 </p>
               </section>
             </div>

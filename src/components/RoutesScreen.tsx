@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Route as RouteIcon, Clock, Navigation, CheckCircle, ChevronRight, MapPin, Sparkles, Compass, Users } from 'lucide-react';
 import { useApp } from '../services/store';
 import { TouristRoute, Place } from '../types';
+import { hasVerifiedCoordinates } from '../utils/location';
 
 interface RoutesScreenProps {
   onStartRoute: (route: TouristRoute, initialPlace?: Place) => void;
@@ -29,8 +30,8 @@ export const RoutesScreen: React.FC<RoutesScreenProps> = ({
 
   const handleComoChegarStop = (e: React.MouseEvent, place: Place) => {
     e.stopPropagation();
-    if (!place.latitude || !place.longitude) {
-      setToastMsg('Localização geográfica deste ponto não cadastrada.');
+    if (!hasVerifiedCoordinates(place)) {
+      setToastMsg('Este ponto ainda não tem coordenadas verificadas.');
       setTimeout(() => setToastMsg(null), 2500);
       return;
     }
@@ -51,7 +52,7 @@ export const RoutesScreen: React.FC<RoutesScreenProps> = ({
           Roteiros Turísticos
         </h2>
         <p className="text-xs text-stone-500 mt-0.5">
-          Descubra Conservatória com itinerários prontos para caminhar, ouvir serestas e explorar cachoeiras.
+          Listas de paradas curadas. A navegação é oferecida apenas para pontos com coordenadas verificadas.
         </p>
 
         {toastMsg && (
@@ -60,6 +61,12 @@ export const RoutesScreen: React.FC<RoutesScreenProps> = ({
           </div>
         )}
       </div>
+
+      {routes.length === 0 && (
+        <div className="rounded-2xl border border-stone-200 bg-white p-4 text-sm text-stone-600">
+          Nenhum roteiro foi publicado. Os trajetos só aparecerão após cadastro e revisão; o app não cria caminhos por aproximação.
+        </div>
+      )}
 
       {/* Routes Horizontal Tabs */}
       <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
@@ -114,7 +121,7 @@ export const RoutesScreen: React.FC<RoutesScreenProps> = ({
               {activeRoute.description}
             </p>
 
-            {/* Primary Action: COMEÇAR ROTEIRO */}
+            {/* Show only the selected itinerary's verified map stops; no path is inferred. */}
             <button
               onClick={() => {
                 setActiveRoute(activeRoute);
@@ -123,7 +130,7 @@ export const RoutesScreen: React.FC<RoutesScreenProps> = ({
               className="w-full py-3.5 px-4 rounded-2xl bg-[#0d3822] hover:bg-[#124b2e] active:scale-[0.99] text-white font-bold text-sm shadow-lg shadow-[#0d3822]/20 flex items-center justify-center gap-2 transition"
             >
               <Navigation className="w-4 h-4" />
-              <span>COMEÇAR ROTEIRO</span>
+              <span>VER PARADAS DO ROTEIRO</span>
             </button>
 
             {/* Stops list */}
