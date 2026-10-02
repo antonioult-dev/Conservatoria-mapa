@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Central de Emergência — Conservatória Turismo (Offline)</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: #121212;
+      color: #ffffff;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+    }
+    .container {
+      width: 100%;
+      max-width: 480px;
+      margin: 0 auto;
+    }
+    .header {
+      background: #1e1e1e;
+      border: 1px solid #dc2626;
+      border-radius: 20px;
+      padding: 16px;
+      text-align: center;
+      margin-bottom: 16px;
+    }
+    .badge {
+      display: inline-block;
+      background: #dc2626;
+      color: #ffffff;
+      font-size: 11px;
+      font-weight: 800;
+      padding: 4px 10px;
+      border-radius: 12px;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+    h1 { font-size: 20px; font-weight: 800; margin-bottom: 4px; }
+    p.sub { font-size: 12px; color: #a3a3a3; }
+    .sos-banner {
+      background: linear-gradient(135deg, #7f1d1d, #450a0a);
+      border: 2px solid #ef4444;
+      border-radius: 20px;
+      padding: 16px;
+      margin-bottom: 16px;
+      text-align: center;
+    }
+    .sos-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      width: 100%;
+      background: #dc2626;
+      color: #fff;
+      font-size: 17px;
+      font-weight: 800;
+      padding: 16px;
+      border-radius: 14px;
+      text-decoration: none;
+      margin-top: 10px;
+      box-shadow: 0 4px 14px rgba(220, 38, 38, 0.4);
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .card {
+      background: #1f1f1f;
+      border: 1px solid #333333;
+      border-radius: 16px;
+      padding: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      text-decoration: none;
+      color: #ffffff;
+    }
+    .card:active { transform: scale(0.98); }
+    .card-title { font-size: 12px; color: #9ca3af; text-transform: uppercase; font-weight: 700; }
+    .card-number { font-size: 28px; font-weight: 900; line-height: 1.1; margin: 2px 0; }
+    .card-desc { font-size: 11px; color: #6b7280; }
+    .call-btn {
+      background: #374151;
+      padding: 10px 16px;
+      border-radius: 12px;
+      font-weight: 800;
+      font-size: 13px;
+    }
+    .police .card-number { color: #60a5fa; }
+    .police .call-btn { background: #2563eb; }
+    .woman .card-number { color: #c084fc; }
+    .woman .call-btn { background: #9333ea; }
+    .samu .card-number { color: #34d399; }
+    .samu .call-btn { background: #059669; }
+    .fire .card-number { color: #fbbf24; }
+    .fire .call-btn { background: #d97706; }
+    .footer {
+      font-size: 11px;
+      color: #737373;
+      text-align: center;
+      line-height: 1.4;
+      background: #171717;
+      border-radius: 14px;
+      padding: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <span class="badge">Modo Offline Ativo</span>
+      <h1>Central de Emergência</h1>
+      <p class="sub">Conservatória — Valença, RJ</p>
+      <p class="sub" style="margin-top: 4px; color: #34d399;">✓ Os números abaixo funcionam via sinal de celular sem consumir internet.</p>
+    </div>
+
+    <!-- SOS 190 Rápido -->
+    <div class="sos-banner">
+      <span style="font-size: 11px; font-weight: 800; text-transform: uppercase; color: #fca5a5;">Perigo Imediato</span>
+      <h2 style="font-size: 18px; margin: 4px 0;">Emergência Pessoal</h2>
+      <a href="tel:190" class="sos-btn">📞 LIGAR PARA O 190 (POLÍCIA)</a>
+    </div>
+
+    <!-- 4 Botões Oficiais -->
+    <div class="grid">
+      <a href="tel:190" class="card police">
+        <div>
+          <div class="card-title">Polícia Militar</div>
+          <div class="card-number">190</div>
+          <div class="card-desc">Crimes, roubos e proteção</div>
+        </div>
+        <div class="call-btn">LIGAR</div>
+      </a>
+
+      <a href="tel:180" class="card woman">
+        <div>
+          <div class="card-title">Violência contra a Mulher</div>
+          <div class="card-number">180</div>
+          <div class="card-desc">Atendimento e proteção</div>
+        </div>
+        <div class="call-btn">LIGAR</div>
+      </a>
+
+      <a href="tel:192" class="card samu">
+        <div>
+          <div class="card-title">SAMU (Ambulância)</div>
+          <div class="card-number">192</div>
+          <div class="card-desc">Emergência médica urgente</div>
+        </div>
+        <div class="call-btn">LIGAR</div>
+      </a>
+
+      <a href="tel:193" class="card fire">
+        <div>
+          <div class="card-title">Corpo de Bombeiros</div>
+          <div class="card-number">193</div>
+          <div class="card-desc">Resgate, fogo e acidentes</div>
+        </div>
+        <div class="call-btn">LIGAR</div>
+      </a>
+    </div>
+
+    <div class="footer">
+      Em situações de emergência, utilize os canais oficiais. O aplicativo apenas facilita o acesso direto aos números no discador do seu telefone.
+    </div>
+  </div>
+</body>
+</html>

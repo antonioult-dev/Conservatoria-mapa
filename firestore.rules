@@ -1,0 +1,66 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper function to check if user is super admin
+    function isSuperAdmin() {
+      return request.auth != null && (
+        request.auth.token.email == 'horizonteverdepousada@gmail.com' ||
+        request.auth.token.email == 'antoniou.lt@gmail.com'
+      );
+    }
+
+    // Users collection
+    match /users/{userId} {
+      allow read: if true;
+      allow write: if request.auth != null && (request.auth.uid == userId || isSuperAdmin());
+    }
+    
+    // Places / Commercial Listings (Isolation between merchants)
+    match /places/{placeId} {
+      allow read: if true;
+      allow create: if request.auth != null || isSuperAdmin();
+      allow update, delete: if isSuperAdmin() || (
+        request.auth != null && resource.data.merchantId == request.auth.uid
+      );
+    }
+
+    // Tour Guides
+    match /guides/{guideId} {
+      allow read: if true;
+      allow create: if request.auth != null || isSuperAdmin();
+      allow update, delete: if isSuperAdmin() || (
+        request.auth != null && (resource.data.userId == request.auth.uid || resource.data.email == request.auth.token.email)
+      );
+    }
+
+    // Financial & Payments (Isolation: each merchant only reads their own payments)
+    match /payments/{paymentId} {
+      allow read: if isSuperAdmin() || (
+        request.auth != null && resource.data.merchantId == request.auth.uid
+      );
+      allow create: if true;
+      allow update, delete: if isSuperAdmin();
+    }
+
+    // Reviews
+    match /reviews/{reviewId} {
+      allow read: if true;
+      allow create: if true;
+      allow update, delete: if isSuperAdmin();
+    }
+
+    // Reports / Denúncias
+    match /reports/{reportId} {
+      allow read: if isSuperAdmin();
+      allow create: if true;
+      allow update, delete: if isSuperAdmin();
+    }
+
+    // App Settings
+    match /settings/{settingId} {
+      allow read: if true;
+      allow write: if isSuperAdmin();
+    }
+  }
+}
