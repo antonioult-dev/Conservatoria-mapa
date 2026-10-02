@@ -19,9 +19,10 @@ import {
   MessageCircle,
   ExternalLink
 } from 'lucide-react';
-import { useApp, calculateDistance, formatDistance } from '../services/store';
+import { useApp, calculateDistance, formatDistance, getReviewSummary } from '../services/store';
 import { Place } from '../types';
 import { toggleSerestaAudio } from '../services/audioService';
+import { hasVerifiedCoordinates } from '../utils/location';
 
 interface PlaceDetailModalProps {
   place: Place | null;
@@ -63,11 +64,13 @@ export const PlaceDetailModal: React.FC<PlaceDetailModalProps> = ({
 
   if (!place) return null;
 
-  const distance = userLocation && place.latitude && place.longitude
+  const hasCoordinates = hasVerifiedCoordinates(place);
+  const distance = userLocation && hasCoordinates
     ? calculateDistance(userLocation.lat, userLocation.lng, place.latitude, place.longitude)
-    : 450;
+    : null;
 
   const placeReviews = reviews.filter((r) => r.placeId === place.id && !r.hidden);
+  const reviewSummary = getReviewSummary(reviews, place.id);
 
   const handleShare = async () => {
     if (navigator.share) {
@@ -92,10 +95,11 @@ export const PlaceDetailModal: React.FC<PlaceDetailModalProps> = ({
     setIsPlayingAudio(playing);
   };
 
-  const handleSubmitReview = (e: React.FormEvent) => {
+  const handleSubmitReview = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!userComment.trim()) return;
-    addReview(place.id, userRating, userComment, authorName);
+    try { await addReview(place.id, userRating, userComment, authorName); }
+    catch (error) { setToastMessage(error instanceof Error ? error.message : 'Não foi possível salvar a avaliação.'); return; }
     setReviewSubmitted(true);
     setUserComment('');
     setTimeout(() => {
@@ -104,7 +108,7 @@ export const PlaceDetailModal: React.FC<PlaceDetailModalProps> = ({
     }, 2000);
   };
 
-  const handleSubmitReport = (e: React.FormEvent) => {
+  const handleSubmitReport = async (e: React.FormEvent) => {
     e.preventDefault();
     const reasonLabels = {
       endereco_errado: 'Endereço errado',
@@ -114,14 +118,14 @@ export const PlaceDetailModal: React.FC<PlaceDetailModalProps> = ({
       outro: 'Outro motivo',
     };
 
-    addReport({
+    try { await addReport({
       placeId: place.id,
       placeName: place.name,
       reason: reportReason,
       reasonLabel: reasonLabels[reportReason],
       details: reportDetails,
       userContact: reportContact,
-    });
+    }); } catch (error) { setToastMessage(error instanceof Error ? error.message : 'Não foi possível enviar a denúncia.'); return; }
 
     setReportSuccess(true);
     setTimeout(() => {
@@ -132,8 +136,8 @@ export const PlaceDetailModal: React.FC<PlaceDetailModalProps> = ({
   };
 
   const openGoogleMaps = () => {
-    if (!place.latitude || !place.longitude) {
-      setToastMessage('Localização não cadastrada.');
+    if (!hasCoordinates) {
+      setToastMessage('Este local ainda não tem coordenadas verificadas.');
       setTimeout(() => setToastMessage(null), 2500);
       return;
     }
@@ -192,7 +196,7 @@ export const PlaceDetailModal: React.FC<PlaceDetailModalProps> = ({
             <div className="flex items-center gap-2 mb-1 flex-wrap">
               {place.verified ? (
                 <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/90 backdrop-blur-sm text-white">
-                  ✓ Verificado Oficial
+                  ✓ Cadastro revisado
                 </span>
               ) : (
                 <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/90 backdrop-blur-sm text-white">
@@ -219,7 +223,7 @@ export const PlaceDetailModal: React.FC<PlaceDetailModalProps> = ({
               <span>•</span>
               <span className="flex items-center gap-1 text-amber-300 font-bold">
                 <Star className="w-3.5 h-3.5 fill-amber-300 text-amber-300" />
-                {place.rating.toFixed(1)} ({place.reviewCount} avaliações)
+                {reviewSummary.rating === null ? 'Sem avaliações' : `${reviewSummary.rating.toFixed(1)} (${reviewSummary.count} avaliações)`}
               </span>
             </div>
           </div>
@@ -258,15 +262,15 @@ export const PlaceDetailModal: React.FC<PlaceDetailModalProps> = ({
               </div>
               <div>
                 <div className="text-xs font-bold text-emerald-950">
-                  {place.latitude && place.longitude ? formatDistance(distance) : 'Localização não cadastrada.'}
+                  {distance !== null ? formatDistance(distance) : hasCoordinates ? 'Distância requer GPS.' : 'Localização não verificada.'}
                 </div>
                 <div className="text-[11px] text-emerald-700">
-                  {place.latitude && place.longitude ? 'Distância do seu ponto' : 'Coordenadas não disponíveis'}
+                  {distance !== null ? 'Distância em linha reta até o ponto' : hasCoordinates ? 'Distância indisponível sem GPS' : 'Coordenadas não verificadas'}
                 </div>
               </div>
             </div>
 
-            {place.latitude && place.longitude ? (
+            {hasCoordinates ? (
               <button
                 onClick={openGoogleMaps}
                 className="px-3.5 py-2.5 rounded-xl bg-[#0d3822] hover:bg-[#124b2e] text-white text-xs font-bold shadow-sm active:scale-95 transition flex items-center gap-1.5 flex-shrink-0"
@@ -284,7 +288,7 @@ export const PlaceDetailModal: React.FC<PlaceDetailModalProps> = ({
           {!place.verified && (
             <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-[11px] flex items-center gap-2">
               <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0" />
-              <span>Localização sob verificação cadastral. Coordenadas aproximadas em fase de homologação.</span>
+              <span>Cadastro em revisão. O app só usa localização quando há coordenadas e uma fonte verificadas.</span>
             </div>
           )}
 

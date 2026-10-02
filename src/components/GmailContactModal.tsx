@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { Mail, Send, X, CheckCircle2, AlertCircle, HelpCircle, Lock } from 'lucide-react';
 import { useApp } from '../services/store';
-import { getCachedAccessToken, signInWithGoogle } from '../services/firebase';
-import { sendGmailSupportEmail, SendSupportEmailParams } from '../services/gmail';
+import { connectGmailWithGoogle, getCachedAccessToken } from '../services/firebase';
+import { sendGmailSupportEmail, SendSupportEmailParams, SUPPORT_EMAIL } from '../services/gmail';
 
 interface GmailContactModalProps {
   isOpen: boolean;
@@ -40,7 +40,7 @@ export const GmailContactModal: React.FC<GmailContactModalProps> = ({
     setIsLoggingIn(true);
     setErrorMessage(null);
     try {
-      const res = await signInWithGoogle();
+      const res = await connectGmailWithGoogle();
       if (!res.success) {
         setErrorMessage(res.error || 'Não foi possível conectar com a Conta Google.');
       } else {
@@ -76,13 +76,13 @@ export const GmailContactModal: React.FC<GmailContactModalProps> = ({
       userEmail: email.trim() || 'Sem e-mail informado',
       subject: subject.trim(),
       message: message.trim(),
-      to: 'antoniou.lt@gmail.com',
+      to: SUPPORT_EMAIL,
     });
 
     setIsSending(false);
 
     if (res.success) {
-      setSuccessMessage('Sua mensagem foi enviada com sucesso diretamente para a equipe oficial de Conservatória Turismo!');
+      setSuccessMessage('Sua mensagem foi enviada ao endereço de suporte configurado.');
       setTimeout(() => {
         setSuccessMessage(null);
         setMessage('');
@@ -106,7 +106,7 @@ export const GmailContactModal: React.FC<GmailContactModalProps> = ({
             </div>
             <div>
               <h3 className="text-sm font-bold font-serif-header">Contato & Sugestões</h3>
-              <p className="text-[11px] text-stone-200">Integração oficial via Google Gmail</p>
+              <p className="text-[11px] text-stone-200">Envio pelo Gmail após autorização Google</p>
             </div>
           </div>
 
@@ -128,7 +128,7 @@ export const GmailContactModal: React.FC<GmailContactModalProps> = ({
               <div>
                 <p className="font-bold">{successMessage}</p>
                 <p className="text-[11px] text-emerald-700 mt-1">
-                  Enviado para: <strong>antoniou.lt@gmail.com</strong>
+                  Enviado para: <strong>{SUPPORT_EMAIL}</strong>
                 </p>
               </div>
             </div>
@@ -153,7 +153,7 @@ export const GmailContactModal: React.FC<GmailContactModalProps> = ({
                   Conecte sua Conta Google para enviar pelo Gmail
                 </h4>
                 <p className="text-[11px] text-stone-500 max-w-sm mx-auto mt-0.5">
-                  O envio utiliza a API oficial do Google Workspace, garantindo que sua mensagem seja autenticada e enviada com segurança.
+                  O envio usa a API Gmail com sua autorização. A mensagem só é enviada depois da confirmação abaixo.
                 </p>
               </div>
 
@@ -161,7 +161,7 @@ export const GmailContactModal: React.FC<GmailContactModalProps> = ({
               <button
                 type="button"
                 onClick={handleGoogleConnect}
-                disabled={isLoggingIn}
+                disabled={isLoggingIn || !SUPPORT_EMAIL}
                 className="inline-flex items-center justify-center gap-2.5 px-4 py-2.5 rounded-xl border border-stone-300 bg-white text-stone-800 hover:bg-stone-50 shadow-2xs font-semibold text-xs transition active:scale-95 disabled:opacity-50"
               >
                 <svg className="w-4 h-4" viewBox="0 0 48 48">
@@ -172,6 +172,7 @@ export const GmailContactModal: React.FC<GmailContactModalProps> = ({
                 </svg>
                 <span>{isLoggingIn ? 'Conectando...' : 'Conectar com Google (Gmail)'}</span>
               </button>
+              {!SUPPORT_EMAIL && <p role="status" className="text-[11px] text-amber-800">Contato indisponível até configurar VITE_SUPPORT_EMAIL no ambiente de build.</p>}
             </div>
           ) : (
             <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-between text-xs text-emerald-900">
@@ -265,12 +266,12 @@ export const GmailContactModal: React.FC<GmailContactModalProps> = ({
             <div className="pt-2 flex items-center justify-between gap-2 border-t border-stone-100">
               <span className="text-[11px] text-stone-400 flex items-center gap-1">
                 <HelpCircle className="w-3.5 h-3.5" />
-                Destino: antoniou.lt@gmail.com
+                Destino: {SUPPORT_EMAIL || 'não configurado'}
               </span>
 
               <button
                 type="submit"
-                disabled={isSending || !hasAccessToken}
+                disabled={isSending || !hasAccessToken || !SUPPORT_EMAIL}
                 className="px-5 py-2.5 rounded-xl bg-[#0d3822] hover:bg-[#124b2e] text-white font-bold text-xs flex items-center gap-2 shadow-xs transition active:scale-95 disabled:opacity-50"
               >
                 <Send className="w-3.5 h-3.5 text-amber-300" />
@@ -294,7 +295,7 @@ export const GmailContactModal: React.FC<GmailContactModalProps> = ({
             </div>
 
             <p className="text-xs text-stone-600 leading-relaxed">
-              Você autoriza o aplicativo a enviar este e-mail através da sua conta Google conectada para o suporte oficial do Conservatória Turismo (<strong>antoniou.lt@gmail.com</strong>)?
+              Você autoriza o aplicativo a enviar este e-mail através da sua conta Google conectada para o endereço de suporte configurado (<strong>{SUPPORT_EMAIL}</strong>)?
             </p>
 
             <div className="p-2.5 rounded-xl bg-stone-50 border border-stone-200 text-[11px] text-stone-600 space-y-1">

@@ -23,6 +23,7 @@ import { Place, TouristRoute } from '../types';
 import { toggleSerestaAudio } from '../services/audioService';
 import { LocalDetailsCard } from './LocalDetailsCard';
 import { PlacesListDrawer } from './PlacesListDrawer';
+import { hasVerifiedCoordinates } from '../utils/location';
 
 interface InteractiveMapProps {
   onOpenDetails: (place: Place) => void;
@@ -44,8 +45,12 @@ interface PlaceCluster {
   id: string;
   lat: number;
   lng: number;
-  places: Place[];
+  places: Array<Place & { latitude: number; longitude: number }>;
 }
+
+const escapeHtml = (value: string) => value.replace(/[&<>"']/g, (character) => ({
+  '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+}[character] || character));
 
 export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   onOpenDetails,
@@ -53,12 +58,12 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   const {
     places,
     routes,
+    reviews,
     selectedPlace,
     setSelectedPlace,
     userLocation,
-    setUserLocation,
+    requestGpsPermission,
     gpsActive,
-    setGpsActive,
     isFavorite,
     toggleFavorite,
   } = useApp();
@@ -69,7 +74,6 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   const tileLayerRef = useRef<L.TileLayer | null>(null);
   const markersLayerGroupRef = useRef<L.LayerGroup | null>(null);
   const userMarkerRef = useRef<L.Marker | null>(null);
-  const routePolylineRef = useRef<L.Polyline | null>(null);
 
   // UI Control references to disable map click propagation
   const headerControlsRef = useRef<HTMLDivElement>(null);
@@ -96,16 +100,13 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   }, [places]);
 
   // Places with valid geographical coordinates
-  const validPlaces = useMemo(() => {
-    return activePlaces.filter((p) => 
-      typeof p.latitude === 'number' && 
-      typeof p.longitude === 'number' && 
-      !isNaN(p.latitude) && 
-      !isNaN(p.longitude) &&
-      p.latitude !== 0 && 
-      p.longitude !== 0
-    );
+  const validPlaces = useMemo<Array<Place & { latitude: number; longitude: number }>>(() => {
+    return activePlaces.filter((p): p is Place & { latitude: number; longitude: number } => hasVerifiedCoordinates(p));
   }, [activePlaces]);
+
+  const initialMapCenter: [number, number] | null = userLocation
+    ? [userLocation.lat, userLocation.lng]
+    : validPlaces[0] ? [validPlaces[0].latitude, validPlaces[0].longitude] : null;
 
   // Category matching helper
   const filterPlaceByCategory = (place: Place, category: MapCategoryFilter): boolean => {
@@ -150,7 +151,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         p.name.toLowerCase().includes(q) ||
         p.description.toLowerCase().includes(q) ||
         p.address.toLowerCase().includes(q) ||
-        (p.categoryLabel && p.categoryLabel.toLowerCase().includes(q))
+        !!p.categoryLabel?.toLowerCase().includes(q)
       );
     }
 
@@ -161,13 +162,13 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   const searchSuggestions = useMemo(() => {
     if (!searchQuery.trim()) return [];
     const q = searchQuery.toLowerCase().trim();
-    return activePlaces.filter((p) => 
+    return validPlaces.filter((p) =>
       p.name.toLowerCase().includes(q) ||
       p.description.toLowerCase().includes(q) ||
       p.address.toLowerCase().includes(q) ||
-      (p.categoryLabel && p.categoryLabel.toLowerCase().includes(q))
+      !!p.categoryLabel?.toLowerCase().includes(q)
     ).slice(0, 6);
-  }, [activePlaces, searchQuery]);
+  }, [validPlaces, searchQuery]);
 
   // Clustered places for coincident / overlapping coordinates
   const clusteredPlaces = useMemo<PlaceCluster[]>(() => {
@@ -218,8 +219,10 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     let t1: any, t2: any, t3: any;
 
     try {
-      // Centro Histórico de Conservatória (Praça da Matriz de Santo Antônio)
-      const CONSERVATORIA_CENTER: [number, number] = [-22.31644, -43.81552];
+      if (!initialMapCenter) {
+        setMapReady(false);
+        return;
+      }
 
       // Limpar instância anterior ou id dangling do Leaflet
       if (mapInstanceRef.current) {
@@ -231,7 +234,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
       }
 
       const map = L.map(container, {
-        center: CONSERVATORIA_CENTER,
+        center: initialMapCenter,
         zoom: 16,
         zoomControl: false,
         attributionControl: false,
@@ -291,7 +294,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         delete (container as any)._leaflet_id;
       }
     };
-  }, []);
+  }, [initialMapCenter?.[0], initialMapCenter?.[1]]);
 
   // Listen to fullscreen changes to update state & invalidate size
   useEffect(() => {
@@ -476,7 +479,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
               ${iconSymbol}
             </div>
             <div class="mt-1 bg-white/95 text-stone-900 text-[10px] font-bold px-1.5 py-0.5 rounded shadow-sm border border-stone-200 whitespace-nowrap max-w-[120px] truncate">
-              ${place.name}
+              ${escapeHtml(place.name)}
             </div>
           </div>
         `,
@@ -498,45 +501,6 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         });
     });
 
-    // 6. Draw Polyline for Active Tourist Route or Destination Path
-    if (routePolylineRef.current) {
-      routePolylineRef.current.remove();
-      routePolylineRef.current = null;
-    }
-
-    if (activeTouristRoute) {
-      // Connect all places on route
-      const routePoints = activeTouristRoute.places
-        .map((pId) => validPlaces.find((p) => p.id === pId))
-        .filter((p): p is Place => !!p)
-        .map((p) => [p.latitude, p.longitude] as [number, number]);
-
-      if (routePoints.length > 1) {
-        routePolylineRef.current = L.polyline(routePoints, {
-          color: '#b48324',
-          weight: 4,
-          opacity: 0.9,
-          dashArray: '6, 8',
-        }).addTo(map);
-      }
-    } else if (userLocation && selectedPlace && selectedPlace.latitude && selectedPlace.longitude) {
-      // Direct path line to selected place
-      const latlngs: L.LatLngExpression[] = [
-        [userLocation.lat, userLocation.lng],
-        [
-          (userLocation.lat + selectedPlace.latitude) / 2 + 0.0003,
-          (userLocation.lng + selectedPlace.longitude) / 2 - 0.0002,
-        ],
-        [selectedPlace.latitude, selectedPlace.longitude],
-      ];
-
-      routePolylineRef.current = L.polyline(latlngs, {
-        color: '#0d3822',
-        weight: 3.5,
-        opacity: 0.85,
-        dashArray: '6, 6',
-      }).addTo(map);
-    }
   }, [clusteredPlaces, selectedPlace, activeTouristRoute, userLocation, validPlaces]);
 
   // CONTROLE: ZOOM +
@@ -563,32 +527,18 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     e?.preventDefault();
     setStatusNotice('Obtendo sinal GPS do aparelho...');
 
-    if (!('geolocation' in navigator)) {
-      setStatusNotice('Não foi possível acessar sua localização. Verifique a permissão do navegador.');
-      setTimeout(() => setStatusNotice(null), 4000);
-      return;
-    }
-
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const lat = pos.coords.latitude;
-        const lng = pos.coords.longitude;
-        setUserLocation({ lat, lng });
-        setGpsActive(true);
+    requestGpsPermission(
+      ({ lat, lng }) => {
         setStatusNotice('Localização obtida! Mostrando "Você está aqui".');
         setTimeout(() => setStatusNotice(null), 3000);
-
         if (mapInstanceRef.current) {
           mapInstanceRef.current.flyTo([lat, lng], 17, { duration: 1.2 });
         }
       },
-      (err) => {
-        console.warn('Geolocation error:', err.message);
-        setGpsActive(false);
+      () => {
         setStatusNotice('Não foi possível acessar sua localização. Verifique a permissão do navegador.');
         setTimeout(() => setStatusNotice(null), 4000);
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 }
+      }
     );
   };
 
@@ -629,13 +579,16 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     setTimeout(() => setStatusNotice(null), 2500);
   };
 
-  // CONTROLE: CENTRALIZAR CONSERVATÓRIA
+  // Centraliza somente em uma localização real obtida pelo navegador ou previamente validada.
   const handleCenterConservatoria = (e?: React.MouseEvent) => {
     e?.stopPropagation();
     e?.preventDefault();
-    if (mapInstanceRef.current) {
-      mapInstanceRef.current.flyTo([-22.31644, -43.81552], 16, { duration: 1.2 });
-      setStatusNotice('Mapa centralizado na Praça da Matriz de Conservatória');
+    const center = userLocation || (validPlaces[0] ? { lat: validPlaces[0].latitude, lng: validPlaces[0].longitude } : null);
+    if (!center) {
+      requestGpsPermission(undefined, () => setStatusNotice('Sem GPS ou coordenadas verificadas; o mapa permanece sem localização.'));
+    } else if (mapInstanceRef.current) {
+      mapInstanceRef.current.flyTo([center.lat, center.lng], 16, { duration: 1.2 });
+      setStatusNotice(userLocation ? 'Mapa centralizado na sua localização atual.' : 'Mapa centralizado em um local com coordenadas verificadas.');
       setTimeout(() => setStatusNotice(null), 2500);
     }
   };
@@ -647,7 +600,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     setIsSearchFocused(false);
     setClusterPicker(null);
 
-    if (mapInstanceRef.current && place.latitude && place.longitude) {
+    if (mapInstanceRef.current && hasVerifiedCoordinates(place)) {
       mapInstanceRef.current.flyTo([place.latitude, place.longitude], 17, { duration: 1.2 });
     }
   };
@@ -658,7 +611,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     setShowPlacesDrawer(false);
     setClusterPicker(null);
 
-    if (mapInstanceRef.current && place.latitude && place.longitude) {
+    if (mapInstanceRef.current && hasVerifiedCoordinates(place)) {
       mapInstanceRef.current.flyTo([place.latitude, place.longitude], 17, { duration: 1.2 });
     }
   };
@@ -674,6 +627,16 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
       className="relative w-full overflow-hidden bg-[#f4efe6] select-none font-sans"
       style={{ height: 'calc(100dvh - 120px)', minHeight: '520px' }}
     >
+      {!mapReady && !mapError && (
+        <div className="absolute inset-0 z-[900] flex items-center justify-center p-6 text-center">
+          <div className="max-w-xs rounded-2xl bg-white/95 p-5 shadow-lg">
+            <MapPin className="mx-auto mb-2 h-7 w-7 text-[#0d3822]" />
+            <p className="text-sm font-bold text-stone-900">O mapa precisa de uma posição confiável.</p>
+            <p className="mt-1 text-xs text-stone-600">Ative o GPS ou aguarde locais com coordenadas verificadas.</p>
+            <button onClick={() => requestGpsPermission()} className="mt-3 rounded-xl bg-[#0d3822] px-4 py-2 text-xs font-bold text-white">Usar localização real</button>
+          </div>
+        </div>
+      )}
       {/* 1. TOP HEADER OVER MAP (Search, Category Chips & Branding) */}
       <div 
         ref={headerControlsRef}
@@ -725,7 +688,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
               value={searchQuery}
               onFocus={() => setIsSearchFocused(true)}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="O que você procura? (ex: Locomotiva, Túnel, Pousada Horizonte Verde)..."
+              placeholder="O que você procura? (ex.: restaurante, pousada, serviço)..."
               className="w-full bg-transparent text-xs sm:text-sm text-stone-900 placeholder-stone-400 focus:outline-none"
             />
             {searchQuery && (
@@ -813,7 +776,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           <div className="pointer-events-auto flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 text-xs">
             <span className="text-[10px] font-black uppercase tracking-wider text-amber-800 bg-amber-100/90 px-2 py-1 rounded-full flex items-center gap-1 flex-shrink-0">
               <RouteIcon className="w-3 h-3" />
-              <span>Roteiros:</span>
+          <span>Paradas:</span>
             </span>
             {routes.map((route) => {
               const isSelected = activeTouristRoute?.id === route.id;
@@ -825,7 +788,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                       setActiveTouristRoute(null);
                     } else {
                       setActiveTouristRoute(route);
-                      setStatusNotice(`Roteiro ativado: ${route.title}`);
+                      setStatusNotice(`Paradas do roteiro filtradas: ${route.title}`);
                       setTimeout(() => setStatusNotice(null), 3000);
                     }
                   }}
@@ -941,7 +904,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         <button
           onClick={handleCenterConservatoria}
           aria-label="Voltar a Conservatória"
-          title="Centralizar na Praça da Matriz de Conservatória"
+          title="Centralizar no GPS ou em um local verificado"
           className="w-10 h-10 rounded-2xl bg-amber-500 hover:bg-amber-400 text-stone-950 shadow-lg flex items-center justify-center active:scale-95 transition cursor-pointer"
         >
           <Compass className="w-5 h-5 text-stone-950" />
@@ -1016,6 +979,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         >
           <LocalDetailsCard
             place={selectedPlace}
+            reviews={reviews}
             userLocation={userLocation}
             isFavorite={isFavorite(selectedPlace.id)}
             onToggleFavorite={toggleFavorite}
@@ -1032,6 +996,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         isOpen={showPlacesDrawer}
         onClose={() => setShowPlacesDrawer(false)}
         places={filteredPlaces}
+        reviews={reviews}
         selectedPlaceId={selectedPlace?.id}
         onSelectPlace={handleSelectFromDrawer}
         userLocation={userLocation}

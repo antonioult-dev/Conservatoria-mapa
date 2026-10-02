@@ -1,5 +1,7 @@
 import { getCachedAccessToken } from './firebase';
 
+export const SUPPORT_EMAIL = import.meta.env.VITE_SUPPORT_EMAIL?.trim() || '';
+
 export interface SendSupportEmailParams {
   to?: string;
   category: 'SUGESTAO' | 'SUPORTE' | 'GUIA' | 'COMERCIO' | 'OUTRO';
@@ -26,7 +28,8 @@ export async function sendGmailSupportEmail(params: SendSupportEmailParams): Pro
     };
   }
 
-  const recipient = params.to || 'antoniou.lt@gmail.com';
+  const recipient = params.to || SUPPORT_EMAIL;
+  if (!recipient) return { success: false, error: 'Contato por e-mail indisponível: configure VITE_SUPPORT_EMAIL no ambiente de build.' };
   const categoryLabels = {
     SUGESTAO: '💡 Sugestão para o App',
     SUPORTE: '🛠️ Suporte Técnico',

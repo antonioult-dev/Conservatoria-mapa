@@ -1,5 +1,6 @@
 import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
+import { firebaseConfigurationError } from './services/firebase';
 import 'leaflet/dist/leaflet.css';
 import './index.css';
 
@@ -17,5 +18,16 @@ if ('serviceWorker' in navigator) {
   });
 }
 
-createRoot(document.getElementById('root')!).render(<App />);
+const root = createRoot(document.getElementById('root')!);
+if (firebaseConfigurationError) {
+  root.render(
+    <main className="min-h-screen bg-stone-50 p-8 text-stone-900" role="alert">
+      <h1 className="text-xl font-bold">Firebase ainda não configurado</h1>
+      <p className="mt-3 max-w-xl text-sm">{firebaseConfigurationError}</p>
+      <p className="mt-2 max-w-xl text-sm">Configure os identificadores públicos do Firebase no ambiente de build e gere novamente o bundle. Nenhum segredo do servidor deve ser informado aqui.</p>
+    </main>,
+  );
+} else {
+  root.render(<App />);
+}
 

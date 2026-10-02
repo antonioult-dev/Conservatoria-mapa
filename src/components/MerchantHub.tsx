@@ -37,10 +37,6 @@ export const MerchantHub: React.FC<MerchantHubProps> = ({
     registerMerchant,
     loginWithGoogle,
     updatePlace,
-    createPixPayment,
-    confirmPaymentWebhook,
-    settings,
-    payments,
   } = useApp();
 
   const [viewState, setViewState] = useState<'landing' | 'register' | 'payment' | 'dashboard'>(
@@ -54,7 +50,6 @@ export const MerchantHub: React.FC<MerchantHubProps> = ({
   const [phone, setPhone] = useState('');
   const [whatsapp, setWhatsapp] = useState('');
   const [category, setCategory] = useState<PlaceCategory>('gastronomia');
-  const [password, setPassword] = useState('');
   const [googleLoading, setGoogleLoading] = useState(false);
 
   const handleMerchantGoogleAuth = async () => {
@@ -68,16 +63,13 @@ export const MerchantHub: React.FC<MerchantHubProps> = ({
   };
 
   // Active Payment State
-  const [currentPaymentTx, setCurrentPaymentTx] = useState<any>(null);
-  const [pixCopied, setPixCopied] = useState(false);
-  const [paymentProcessing, setPaymentProcessing] = useState(false);
 
   // Merchant's business place
   const merchantBusiness = places.find(
     (p) => p.merchantId === currentUser?.id || (currentUser?.merchantBusinessId && p.id === currentUser.merchantBusinessId)
   );
 
-  // Edit form in merchant dashboard
+  // Merchant-editable profile fields; geographic coordinates are validated by an administrator.
   const [editDesc, setEditDesc] = useState(merchantBusiness?.description || '');
   const [editAddress, setEditAddress] = useState(merchantBusiness?.address || '');
   const [editHours, setEditHours] = useState(merchantBusiness?.hours || '');
@@ -85,61 +77,42 @@ export const MerchantHub: React.FC<MerchantHubProps> = ({
   const [editWhatsapp, setEditWhatsapp] = useState(merchantBusiness?.whatsapp || '');
   const [editInstagram, setEditInstagram] = useState(merchantBusiness?.instagram || '');
   const [editWebsite, setEditWebsite] = useState(merchantBusiness?.website || '');
-  const [editLat, setEditLat] = useState(merchantBusiness?.latitude || -22.31644);
-  const [editLng, setEditLng] = useState(merchantBusiness?.longitude || -43.81552);
   const [editImageUrl, setEditImageUrl] = useState(merchantBusiness?.imageUrl || '');
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [saveError, setSaveError] = useState('');
 
   // Handle register merchant
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!responsibleName || !businessName || !email) return;
 
-    const user = await registerMerchant({
+    let user;
+    try {
+      user = await registerMerchant({
       name: responsibleName,
       email,
       businessName,
       phone,
       whatsapp,
       category,
-    });
+      });
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'Não foi possível cadastrar o negócio.');
+      return;
+    }
 
-    // Create PIX transaction for R$ 49,90
+    // No payment provider is configured; keep the business pending.
     if (user.merchantBusinessId) {
-      const tx = createPixPayment(
-        user.merchantBusinessId,
-        businessName,
-        settings.commercialPrice || 49.90
-      );
-      setCurrentPaymentTx(tx);
       setViewState('payment');
     }
   };
 
-  // Simulate payment confirmation via webhook trigger
-  const handleSimulateWebhookPayment = () => {
-    if (!currentPaymentTx) return;
-    setPaymentProcessing(true);
-    setTimeout(() => {
-      confirmPaymentWebhook(currentPaymentTx.id);
-      setPaymentProcessing(false);
-      setViewState('dashboard');
-    }, 1500);
-  };
-
-  const handleCopyPix = () => {
-    if (currentPaymentTx?.pixCode) {
-      navigator.clipboard?.writeText(currentPaymentTx.pixCode);
-      setPixCopied(true);
-      setTimeout(() => setPixCopied(false), 2500);
-    }
-  };
-
-  const handleSaveDashboard = (e: React.FormEvent) => {
+  const handleSaveDashboard = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!merchantBusiness) return;
 
-    updatePlace(merchantBusiness.id, {
+    setSaveError('');
+    try { await updatePlace(merchantBusiness.id, {
       description: editDesc,
       address: editAddress,
       hours: editHours,
@@ -147,10 +120,8 @@ export const MerchantHub: React.FC<MerchantHubProps> = ({
       whatsapp: editWhatsapp,
       instagram: editInstagram,
       website: editWebsite,
-      latitude: parseFloat(editLat as any),
-      longitude: parseFloat(editLng as any),
       imageUrl: editImageUrl || merchantBusiness.imageUrl,
-    });
+    }); } catch (error) { setSaveError(error instanceof Error ? error.message : 'Não foi possível salvar as alterações.'); return; }
 
     setSaveSuccess(true);
     setTimeout(() => setSaveSuccess(false), 2500);
@@ -175,7 +146,7 @@ export const MerchantHub: React.FC<MerchantHubProps> = ({
               Coloque seu negócio no mapa de Conservatória.
             </h2>
             <p className="mt-2 text-xs text-stone-200 leading-relaxed">
-              Alcance milhares de turistas que visitam a Capital da Seresta todos os fins de semana em busca de pousadas, restaurantes, artesanatos e serviços.
+              Cadastre as informações do seu estabelecimento para que visitantes possam consultá-las após a revisão e publicação do perfil.
             </p>
 
             {/* Price Badge */}
@@ -183,12 +154,12 @@ export const MerchantHub: React.FC<MerchantHubProps> = ({
               <div>
                 <span className="text-xs text-stone-300">Anúncio Comercial:</span>
                 <div className="text-2xl font-black text-amber-300">
-                  R$ {settings.commercialPrice?.toFixed(2) || '49,90'}
+                  R$ 49,90
                   <span className="text-xs font-normal text-white"> /mês</span>
                 </div>
               </div>
               <span className="text-[11px] text-emerald-300 font-semibold">
-                Assinatura mensal sem carência
+                Preço oficial • cobrança ainda indisponível
               </span>
             </div>
           </div>
@@ -202,7 +173,7 @@ export const MerchantHub: React.FC<MerchantHubProps> = ({
             <div className="space-y-2.5 text-xs text-stone-700">
               <div className="flex items-start gap-2.5">
                 <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
-                <span><strong>Destaque no Mapa Interativo:</strong> Marcador personalizado com foto e indicação de rota por GPS.</span>
+                <span><strong>Presença no mapa:</strong> O marcador só aparece após a equipe revisar e publicar as coordenadas informadas.</span>
               </div>
               <div className="flex items-start gap-2.5">
                 <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
@@ -214,7 +185,7 @@ export const MerchantHub: React.FC<MerchantHubProps> = ({
               </div>
               <div className="flex items-start gap-2.5">
                 <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
-                <span><strong>Painel Exclusivo do Comerciante:</strong> Atualize horários, fotos, cardápios e promoções a qualquer momento.</span>
+                <span><strong>Painel do Comerciante:</strong> Atualize descrição, endereço, imagem, horários e contatos do cadastro.</span>
               </div>
             </div>
 
@@ -347,7 +318,7 @@ export const MerchantHub: React.FC<MerchantHubProps> = ({
                   required
                   value={whatsapp}
                   onChange={(e) => setWhatsapp(e.target.value)}
-                  placeholder="(24) 99999-9999"
+                  placeholder="(DD) 00000-0000"
                   className="w-full text-xs p-3 rounded-xl border border-stone-300 focus:outline-none focus:ring-2 focus:ring-[#0d3822]"
                 />
               </div>
@@ -361,24 +332,11 @@ export const MerchantHub: React.FC<MerchantHubProps> = ({
                 type="text"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                placeholder="(24) 2438-0000"
+                placeholder="(DD) 0000-0000"
                 className="w-full text-xs p-3 rounded-xl border border-stone-300 focus:outline-none focus:ring-2 focus:ring-[#0d3822]"
               />
             </div>
 
-            <div>
-              <label className="block text-xs font-bold text-stone-700 mb-1">
-                Senha de Acesso ao Painel *
-              </label>
-              <input
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Mínimo 6 caracteres"
-                className="w-full text-xs p-3 rounded-xl border border-stone-300 focus:outline-none focus:ring-2 focus:ring-[#0d3822]"
-              />
-            </div>
           </div>
 
           <div className="pt-2 space-y-2">
@@ -386,7 +344,7 @@ export const MerchantHub: React.FC<MerchantHubProps> = ({
               type="submit"
               className="w-full py-3.5 px-4 rounded-2xl bg-[#0d3822] hover:bg-[#124b2e] text-white font-bold text-sm shadow-md active:scale-95 transition"
             >
-              Prosseguir para Pagamento (R$ {settings.commercialPrice?.toFixed(2) || '49,90'})
+              Prosseguir (R$ 49,90/mês)
             </button>
 
             <button
@@ -400,77 +358,23 @@ export const MerchantHub: React.FC<MerchantHubProps> = ({
         </form>
       )}
 
-      {/* 3. Real Payment Flow (PIX & Card Gateway) */}
+      {/* Payment remains unavailable until a real provider is configured. */}
       {viewState === 'payment' && (
         <div className="p-5 rounded-3xl bg-white border border-stone-200 shadow-sm space-y-4 animate-in fade-in">
           <div>
             <span className="text-[10px] font-bold text-[#0d3822] uppercase tracking-wider">
-              Passo 2 de 2 • Pagamento Seguro
+              Assinatura pendente de ativação
             </span>
             <h3 className="text-xl font-bold font-serif-header text-stone-900">
               Pagamento da Assinatura Mensal
             </h3>
             <p className="text-xs text-stone-500 mt-0.5">
-              Valor do plano comercial: <strong>R$ {settings.commercialPrice?.toFixed(2) || '49,90'}/mês</strong>
+              Valor oficial: <strong>R$ 49,90/mês</strong>
             </p>
           </div>
 
-          {/* PIX Box */}
-          <div className="p-4 rounded-2xl bg-stone-50 border border-stone-200 text-center space-y-3">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 text-emerald-900 text-xs font-bold">
-              <QrCode className="w-4 h-4 text-emerald-700" />
-              <span>Pague via PIX com ativação rápida</span>
-            </div>
-
-            {/* QR Code */}
-            <div className="w-48 h-48 mx-auto bg-white p-2 rounded-2xl shadow-sm border border-stone-200 flex items-center justify-center">
-              {currentPaymentTx?.pixQrCodeUrl ? (
-                <img
-                  src={currentPaymentTx.pixQrCodeUrl}
-                  alt="PIX QR Code Conservatória Turismo"
-                  className="w-full h-full object-contain"
-                />
-              ) : (
-                <div className="text-stone-400 text-xs">Carregando QR Code...</div>
-              )}
-            </div>
-
-            {/* Copy PIX Key */}
-            <button
-              onClick={handleCopyPix}
-              className="w-full py-2.5 px-3 rounded-xl bg-stone-200 hover:bg-stone-300 text-stone-800 text-xs font-bold flex items-center justify-center gap-2 active:scale-95 transition"
-            >
-              <Copy className="w-3.5 h-3.5 text-[#0d3822]" />
-              <span>{pixCopied ? 'Código PIX Copiado!' : 'Copiar Chave PIX Copia-e-Cola'}</span>
-            </button>
-          </div>
-
-          {/* Webhook real trigger / confirmation simulator */}
-          <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-xs space-y-2">
-            <div className="flex items-start gap-2 text-amber-900 font-semibold">
-              <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
-              <span>Confirmação Real de Pagamento & Webhook:</span>
-            </div>
-            <p className="text-[11px] text-amber-800 leading-relaxed">
-              O sistema aguarda a notificação oficial do gateway bancário. Em ambiente de homologação, utilize o botão abaixo para disparar o webhook de confirmação automática:
-            </p>
-            <button
-              onClick={handleSimulateWebhookPayment}
-              disabled={paymentProcessing}
-              className="w-full py-2.5 px-3 rounded-xl bg-[#0d3822] text-white font-bold text-xs hover:bg-[#124b2e] active:scale-95 transition flex items-center justify-center gap-2"
-            >
-              {paymentProcessing ? (
-                <>
-                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                  <span>Processando Webhook Bancário...</span>
-                </>
-              ) : (
-                <>
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>Confirmar Recebimento do PIX (Webhook)</span>
-                </>
-              )}
-            </button>
+          <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-sm text-amber-950">
+            Pagamentos ainda não estão habilitados: falta configurar um provedor de cobrança e confirmação segura no servidor. Nenhum PIX foi gerado ou cobrado.
           </div>
         </div>
       )}
@@ -504,7 +408,7 @@ export const MerchantHub: React.FC<MerchantHubProps> = ({
                 )}
                 {merchantBusiness?.status === 'PENDING_PAYMENT' && (
                   <span className="px-3 py-1 rounded-full text-xs font-bold bg-red-100 text-red-800">
-                    ⚠️ PAGAMENTO PENDENTE
+                    ⚠️ PAGAMENTO NÃO CONFIGURADO
                   </span>
                 )}
                 {merchantBusiness?.status === 'EXPIRED' && (
@@ -518,18 +422,18 @@ export const MerchantHub: React.FC<MerchantHubProps> = ({
             {/* Explanation on status */}
             {merchantBusiness?.status === 'PENDING_APPROVAL' && (
               <div className="p-3 rounded-2xl bg-amber-50 border border-amber-200 text-xs text-amber-900 leading-relaxed">
-                <strong>Pagamento confirmado!</strong> Seu cadastro foi enviado aos administradores do Conservatória Turismo e será publicado em instantes após conferência dos dados.
+                <strong>Cadastro enviado.</strong> Seu negócio aguarda conferência dos dados pela equipe.
               </div>
             )}
 
             {merchantBusiness?.status === 'PENDING_PAYMENT' && (
               <div className="p-3 rounded-2xl bg-red-50 border border-red-200 text-xs text-red-900 flex items-center justify-between">
-                <span>Pagamento de R$ 49,90 ainda não confirmado.</span>
+                <span>O cadastro aguarda uma integração de cobrança. Nenhum pagamento foi solicitado ou confirmado.</span>
                 <button
                   onClick={() => setViewState('payment')}
                   className="px-3 py-1 bg-red-600 text-white rounded-lg text-xs font-bold hover:bg-red-700"
                 >
-                  Pagar PIX
+                  Ver situação
                 </button>
               </div>
             )}
@@ -556,35 +460,8 @@ export const MerchantHub: React.FC<MerchantHubProps> = ({
               </button>
             )}
 
-            {/* Financial Performance, Expenses & Breakeven KPIs */}
-            <div className="pt-2 border-t border-stone-100 space-y-2">
-              <span className="text-[10px] font-bold text-stone-400 uppercase tracking-wider block">
-                Indicadores Financeiros & Ponto de Equilíbrio
-              </span>
-
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                <div className="p-2.5 rounded-xl bg-stone-50 border border-stone-200">
-                  <span className="text-[10px] text-stone-500 font-semibold block">Custo Fixo (Assinatura)</span>
-                  <span className="text-sm font-black text-stone-900">R$ 49,90 <span className="text-[10px] font-normal text-stone-500">/mês</span></span>
-                  <span className="text-[10px] text-stone-400 block mt-0.5">Sem taxas extras</span>
-                </div>
-
-                <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200">
-                  <span className="text-[10px] text-emerald-800 font-semibold block">Comissão por Venda</span>
-                  <span className="text-sm font-black text-emerald-900">0% <span className="text-[10px] font-normal text-emerald-700">(R$ 0,00)</span></span>
-                  <span className="text-[10px] text-emerald-700 block mt-0.5">100% da margem é sua</span>
-                </div>
-              </div>
-
-              <div className="p-3 rounded-xl bg-stone-50 border border-stone-200 text-[11px] text-stone-600 space-y-1">
-                <div className="flex items-center justify-between font-bold text-stone-800 text-xs">
-                  <span>Ponto de Equilíbrio (Breakeven):</span>
-                  <span className="text-emerald-800 font-black">1 cliente / mês</span>
-                </div>
-                <p className="text-[10px] text-stone-500 leading-relaxed">
-                  Com apenas 1 venda ou diária direta via WhatsApp (ticket médio de R$ 50), o custo de R$ 49,90/mês é 100% coberto. A economia estimada em comissão frente a marketplaces tradicionais (15% a 25%) preserva toda a sua margem de lucro líquido.
-                </p>
-              </div>
+            <div className="pt-3 border-t border-stone-100 text-xs text-stone-600">
+              Preço comercial definido: <strong>R$ 49,90 por mês</strong>. A plataforma ainda não processa cobranças nem registra vendas, comissões ou receita.
             </div>
           </div>
 
@@ -596,6 +473,7 @@ export const MerchantHub: React.FC<MerchantHubProps> = ({
               </h4>
 
               <div className="space-y-3">
+                {saveError && <p role="alert" className="rounded-xl bg-red-50 p-3 text-xs text-red-800">{saveError}</p>}
                 <div>
                   <label className="block text-xs font-bold text-stone-700 mb-1">
                     Foto Principal (URL da Imagem):
@@ -639,33 +517,7 @@ export const MerchantHub: React.FC<MerchantHubProps> = ({
                     className="w-full text-xs p-2.5 rounded-xl border border-stone-300 focus:outline-none focus:ring-2 focus:ring-[#0d3822]"
                   />
                 </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="block text-xs font-bold text-stone-700 mb-1">
-                      Latitude:
-                    </label>
-                    <input
-                      type="number"
-                      step="any"
-                      value={editLat}
-                      onChange={(e) => setEditLat(parseFloat(e.target.value))}
-                      className="w-full text-xs p-2.5 rounded-xl border border-stone-300 focus:outline-none focus:ring-2 focus:ring-[#0d3822]"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-stone-700 mb-1">
-                      Longitude:
-                    </label>
-                    <input
-                      type="number"
-                      step="any"
-                      value={editLng}
-                      onChange={(e) => setEditLng(parseFloat(e.target.value))}
-                      className="w-full text-xs p-2.5 rounded-xl border border-stone-300 focus:outline-none focus:ring-2 focus:ring-[#0d3822]"
-                    />
-                  </div>
-                </div>
+                <p className="text-[10px] text-stone-500">A posição do estabelecimento é publicada no mapa depois que a equipe confere as coordenadas e sua fonte.</p>
 
                 <div className="grid grid-cols-2 gap-2">
                   <div>

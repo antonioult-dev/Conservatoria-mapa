@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Heart, Navigation, Trash2, ChevronRight, Compass } from 'lucide-react';
 import { useApp, calculateDistance, formatDistance } from '../services/store';
 import { Place } from '../types';
+import { hasVerifiedCoordinates } from '../utils/location';
 
 interface FavoritesScreenProps {
   onSelectPlace: (place: Place) => void;
@@ -87,9 +88,9 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({
       ) : (
         <div className="space-y-3">
           {filteredPlaces.map((place) => {
-            const distance = userLocation
+            const distance = userLocation && hasVerifiedCoordinates(place)
               ? calculateDistance(userLocation.lat, userLocation.lng, place.latitude, place.longitude)
-              : 450;
+              : null;
 
             return (
               <div
@@ -113,7 +114,7 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({
                       {place.name}
                     </h4>
                     <p className="text-[11px] text-stone-500 truncate mt-0.5">
-                      {formatDistance(distance)} • {place.address.split(',')[0]}
+                      {distance !== null ? `${formatDistance(distance)} • ` : ''}{place.address.split(',')[0]}
                     </p>
                   </div>
                 </div>

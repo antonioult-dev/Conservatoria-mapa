@@ -17,27 +17,11 @@ export const UserModal: React.FC<UserModalProps> = ({
   onOpenMerchant,
   onOpenLegal,
 }) => {
-  const { currentUser, login, loginWithGoogle, logout } = useApp();
-  const [emailInput, setEmailInput] = useState('');
+  const { currentUser, loginWithGoogle, logout } = useApp();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [msg, setMsg] = useState('');
 
   if (!isOpen) return null;
-
-  const handleQuickLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!emailInput) return;
-    setIsSubmitting(true);
-    const res = await login(emailInput, '123456');
-    setIsSubmitting(false);
-    if (res.success) {
-      setMsg(`Conectado como ${res.user?.name}!`);
-      setTimeout(() => {
-        setMsg('');
-        onClose();
-      }, 1000);
-    }
-  };
 
   const handleGoogleAuth = async (targetRole: 'TURISTA' | 'COMERCIANTE' = 'TURISTA') => {
     setIsSubmitting(true);
@@ -50,7 +34,7 @@ export const UserModal: React.FC<UserModalProps> = ({
         setMsg('');
         onClose();
         if (res.user?.role === 'SUPER_ADMIN') onOpenAdmin();
-        else if (res.user?.role === 'COMERCIANTE') onOpenMerchant();
+        else if (targetRole === 'COMERCIANTE') onOpenMerchant();
       }, 1000);
     } else {
       setMsg(res.error || 'Erro ao conectar com Google.');
@@ -142,34 +126,6 @@ export const UserModal: React.FC<UserModalProps> = ({
               </svg>
               <span>{isSubmitting ? 'Conectando...' : 'Cadastrar ou Entrar com o Google'}</span>
             </button>
-
-            <div className="relative flex items-center justify-center my-2">
-              <div className="border-t border-stone-200 w-full" />
-              <span className="bg-white px-2 text-[10px] uppercase font-bold text-stone-400 absolute">
-                ou com e-mail
-              </span>
-            </div>
-
-            <form onSubmit={handleQuickLogin} className="space-y-2">
-              <label className="block text-xs font-bold text-stone-700">
-                Entrar como Turista ou Comerciante:
-              </label>
-              <input
-                type="email"
-                required
-                value={emailInput}
-                onChange={(e) => setEmailInput(e.target.value)}
-                placeholder="seuemail@exemplo.com"
-                className="w-full text-xs p-2.5 rounded-xl border border-stone-300 focus:outline-none focus:ring-2 focus:ring-[#0d3822]"
-              />
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="w-full py-2.5 rounded-xl bg-[#0d3822] text-white font-bold text-xs hover:bg-[#124b2e] transition"
-              >
-                {isSubmitting ? 'Entrando...' : 'Entrar'}
-              </button>
-            </form>
 
             {msg && (
               <div className="p-2 rounded-xl bg-emerald-100 text-emerald-800 text-xs font-bold text-center">

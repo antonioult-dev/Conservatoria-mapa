@@ -39,7 +39,7 @@ export const FAQSection: React.FC<FAQSectionProps> = ({
       category: 'geral',
       question: 'O que é o aplicativo Conservatória Turismo?',
       answer:
-        'O Conservatória Turismo é o guia oficial digital do distrito de Conservatória (Valença - RJ), conhecida como a Capital da Seresta. Ele reúne pontos turísticos históricos (Túnel que Chora, Locomotiva 206, Ponte dos Arcos), pousadas, restaurantes, serestas, mapa interativo com GPS real, rotas curadas, contratação de guias credenciados e central de emergência.',
+        'O Conservatória Turismo é um catálogo digital de locais e serviços de Conservatória, Valença (RJ). Ele exibe registros publicados no Firebase; o conteúdo depende de cadastro e revisão. O GPS usa apenas a localização autorizada pelo navegador, e a disponibilidade de rotas depende de dados e serviços reais.',
       badge: 'Principal',
     },
     {
@@ -47,15 +47,15 @@ export const FAQSection: React.FC<FAQSectionProps> = ({
       category: 'guias',
       question: 'Como funciona a contratação de guias turísticos?',
       answer:
-        'Na aba "Guias", você encontra profissionais locais devidamente credenciados pelo Ministério do Turismo (CADASTUR). Você pode ver as especialidades de cada um (Serestas Históricas, Ecoturismo/Cachoeiras, Fazendas Coloniais do Café, Tour Noturno), valores por pessoa, itinerários e entrar em contato direto via WhatsApp ou telefone, sem taxas ou comissões intermediárias.',
-      badge: 'Guias CADASTUR',
+        'Na aba "Guias", consulte os perfis que foram publicados após análise. Confirme credenciais, preço, disponibilidade e local de encontro diretamente com o profissional antes de contratar.',
+      badge: 'Perfis publicados',
     },
     {
       id: 'faq_3',
       category: 'comercial',
       question: 'Quanto custa para guias e comércios se cadastrarem no aplicativo?',
       answer:
-        'Tanto os comércios locais (restaurantes, pousadas, lojas e serviços) quanto os guias turísticos participam através de uma assinatura mensal fixa de R$ 49,90/mês. Para os guias, o aplicativo não cobra NENHUMA comissão sobre os passeios contratados pelos turistas: 100% do valor pago pelo visitante fica integralmente com o profissional.',
+        'O preço oficial é R$ 49,90 por mês. A cobrança ainda depende da configuração de um gateway e de confirmação segura no servidor; o app não gera PIX nem confirma pagamentos enquanto isso não estiver disponível.',
       badge: 'R$ 49,90 / mês',
     },
     {
@@ -63,24 +63,24 @@ export const FAQSection: React.FC<FAQSectionProps> = ({
       category: 'guias',
       question: 'Sou guia turístico em Conservatória, como faço meu cadastro?',
       answer:
-        'Acesse a aba "Guias" no menu inferior e toque no botão "Sou Guia" no topo da página. Preencha seus dados cadastrais e número de CADASTUR, escolha suas especialidades e realize a ativação da sua assinatura mensal de R$ 49,90 via PIX ou cartão. Seu perfil é publicado imediatamente com destaque no app.',
-      badge: 'Cadastro Rápido',
+        'Acesse a aba "Guias" e envie seus dados e número de CADASTUR. O cadastro exige login Google e fica pendente até análise. A assinatura custa R$ 49,90 por mês; não há cobrança nem confirmação de pagamento enquanto um gateway real não estiver integrado.',
+      badge: 'Cadastro sujeito à análise',
     },
     {
       id: 'faq_5',
       category: 'mapa',
       question: 'Como funciona a navegação GPS e o botão "Como Chegar"?',
       answer:
-        'Ao autorizar o uso da geolocalização no seu celular, o mapa calcula sua distância exata em metros ou quilômetros até cada ponto turístico, pousada ou restaurante. Ao tocar em "Como Chegar", o app abre automaticamente a rota no Google Maps utilizando sua posição real como ponto de partida.',
-      badge: 'GPS Ativo',
+        'Ao autorizar a geolocalização, o app pode calcular a distância em linha reta entre sua posição atual e locais com coordenadas verificadas. "Como Chegar" abre o Google Maps somente para esses locais; sem GPS ou coordenadas aprovadas, não mostra distância nem inicia navegação.',
+      badge: 'Permissão do navegador',
     },
     {
       id: 'faq_6',
       category: 'geral',
       question: 'O aplicativo funciona se eu ficar sem sinal de internet (offline)?',
       answer:
-        'Sim! O aplicativo foi desenvolvido como Progressive Web App (PWA) com Service Worker avançado. Ele armazena em cache todos os pontos turísticos, roteiros e, principalmente, a Central de Emergência (190, 180, 192, 193), que funciona diretamente pelo discador do seu celular sem depender de dados móveis.',
-      badge: 'Modo Offline',
+        'A interface instalada pode abrir offline, mas o catálogo Firebase exige conexão e não é garantido que os dados estejam disponíveis sem rede. Chamadas para números de emergência dependem de cobertura móvel e disponibilidade do serviço telefônico.',
+      badge: 'Dados online',
     },
     {
       id: 'faq_7',
@@ -95,8 +95,8 @@ export const FAQSection: React.FC<FAQSectionProps> = ({
       category: 'geral',
       question: 'Como enviar uma sugestão ou relatar um problema no app?',
       answer:
-        'Você pode usar o botão "Fale Conosco via Gmail" abaixo para enviar sugestões, solicitar inclusão de novos locais ou tirar dúvidas diretamente com os desenvolvedores e gestores do aplicativo.',
-      badge: 'Gmail Oficial',
+        'O envio por Gmail pede uma autorização Google separada quando você conecta esse recurso. Se a autorização ou a API não estiver configurada, use outro canal de contato disponível.',
+      badge: 'Autorização necessária',
     },
   ];
 

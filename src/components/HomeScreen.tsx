@@ -21,7 +21,8 @@ import {
   Play,
   Square
 } from 'lucide-react';
-import { useApp, calculateDistance, formatDistance } from '../services/store';
+import { useApp, calculateDistance, formatDistance, getReviewSummary } from '../services/store';
+import { hasVerifiedCoordinates } from '../utils/location';
 import { Place, TouristRoute, PlaceCategory } from '../types';
 import { toggleSerestaAudio } from '../services/audioService';
 import { FAQSection } from './FAQSection';
@@ -52,6 +53,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const {
     places,
     routes,
+    reviews,
     userLocation,
     gpsActive,
     settings,
@@ -101,8 +103,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
   const handleComoChegarHome = (e: React.MouseEvent, place: Place) => {
     e.stopPropagation();
-    if (!place.latitude || !place.longitude) {
-      alert('Localização não cadastrada.');
+    if (!hasVerifiedCoordinates(place)) {
+      alert('Este local ainda não tem coordenadas verificadas.');
       return;
     }
     const origin = userLocation ? `&origin=${userLocation.lat},${userLocation.lng}` : '';
@@ -115,26 +117,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     setIsPlayingSeresta(playing);
   };
 
-  const handleQuickChipClick = (term: string) => {
-    const matched = activePlaces.find((p) =>
-      p.name.toLowerCase().includes(term.toLowerCase())
-    );
-    if (matched) {
-      onSelectPlace(matched);
-      onNavigateToTab('mapa');
-    } else {
-      setSearchQuery(term);
-    }
-  };
-
   // Categories config
   const categoriesList = [
-    { id: 'historico', name: 'Histórico', count: '18 locais', icon: Landmark, color: 'bg-emerald-100 text-[#0d3822]' },
-    { id: 'museus', name: 'Museus', count: '7 locais', icon: Building2, color: 'bg-blue-100 text-blue-900' },
-    { id: 'pousadas', name: 'Pousadas', count: '34 locais', icon: Hotel, color: 'bg-teal-100 text-teal-900' },
-    { id: 'gastronomia', name: 'Gastronomia', count: '26 locais', icon: UtensilsCrossed, color: 'bg-amber-100 text-amber-900' },
-    { id: 'cachoeiras', name: 'Cachoeiras', count: '12 locais', icon: Trees, color: 'bg-green-100 text-green-900' },
-    { id: 'eventos', name: 'Eventos', count: 'Ao Vivo', icon: Theater, color: 'bg-purple-100 text-purple-900' },
+    { id: 'historico', name: 'Histórico', icon: Landmark, color: 'bg-emerald-100 text-[#0d3822]' },
+    { id: 'museus', name: 'Museus', icon: Building2, color: 'bg-blue-100 text-blue-900' },
+    { id: 'pousadas', name: 'Pousadas', icon: Hotel, color: 'bg-teal-100 text-teal-900' },
+    { id: 'gastronomia', name: 'Gastronomia', icon: UtensilsCrossed, color: 'bg-amber-100 text-amber-900' },
+    { id: 'cachoeiras', name: 'Cachoeiras', icon: Trees, color: 'bg-green-100 text-green-900' },
+    { id: 'eventos', name: 'Eventos', icon: Theater, color: 'bg-purple-100 text-purple-900' },
   ];
 
   return (
@@ -148,22 +138,21 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         <div className="flex items-center justify-between gap-2 mb-3">
           <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/10 backdrop-blur-md text-[11px] font-semibold text-emerald-300">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span>GPS ATIVO • CENTRO</span>
+            <span>GPS {gpsActive ? 'ATIVO' : 'DESATIVADO'}</span>
           </div>
 
           <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/10 backdrop-blur-md text-[11px] text-amber-200">
-            <span>🌙 21°C</span>
-            <span className="text-white/40">•</span>
-            <span>Noite de Seresta</span>
+            <MapPin className="h-3 w-3" />
+            <span>Conservatória • RJ</span>
           </div>
         </div>
 
         {/* Headline & Subtext */}
         <h2 className="text-2xl sm:text-3xl font-bold font-serif-header text-white leading-tight">
-          {settings.bannerHeadline || 'Bem-vindo à Capital da Seresta!'}
+          {settings.bannerHeadline || 'Conheça Conservatória'}
         </h2>
         <p className="mt-2 text-xs sm:text-sm text-stone-200 leading-relaxed">
-          {settings.bannerSubtext || 'As violas e seresteiros começam às 20h na Praça da Matriz. Aproveite o passeio a pé.'}
+          {settings.bannerSubtext || 'Consulte locais e roteiros cadastrados e publicados no catálogo.'}
         </p>
       </div>
 
@@ -196,18 +185,18 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         {/* Quick Filter Tag Chips */}
         <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5 text-xs">
           <button
-            onClick={() => handleQuickChipClick('Túnel que Chora')}
+            onClick={() => setActiveCategoryFilter('historico')}
             className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-white text-stone-700 hover:bg-stone-50 border border-stone-200 shadow-2xs whitespace-nowrap active:scale-95 transition"
           >
-            <span>💧</span>
-            <span>Túnel que Chora</span>
+            <span>🏛️</span>
+            <span>Locais históricos</span>
           </button>
           <button
-            onClick={() => handleQuickChipClick('Seresta')}
+            onClick={() => setActiveCategoryFilter('eventos')}
             className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-white text-stone-700 hover:bg-stone-50 border border-stone-200 shadow-2xs whitespace-nowrap active:scale-95 transition"
           >
-            <span>🎵</span>
-            <span>Seresta Noturna</span>
+            <span>🎟️</span>
+            <span>Eventos cadastrados</span>
           </button>
           <button
             onClick={() => {
@@ -215,8 +204,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             }}
             className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-white text-stone-700 hover:bg-stone-50 border border-stone-200 shadow-2xs whitespace-nowrap active:scale-95 transition"
           >
-            <span>🏨</span>
-            <span>Pousadas</span>
+            <span>🗺️</span>
+            <span>Locais publicados</span>
           </button>
           <button
             onClick={() => {
@@ -225,7 +214,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-900 border border-emerald-300 font-bold shadow-2xs whitespace-nowrap active:scale-95 transition"
           >
             <span>🧭</span>
-            <span>Contratar Guias</span>
+            <span>Ver guias publicados</span>
           </button>
         </div>
 
@@ -244,7 +233,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                   </span>
                 </div>
                 <p className="text-[11px] text-stone-200 mt-0.5">
-                  Roteiros, horários de seresta e dicas com inteligência artificial.
+                  Respostas com busca quando disponível; confirme horários e serviços com fontes locais.
                 </p>
               </div>
             </div>
@@ -309,7 +298,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           </div>
           <div>
             <h3 className="text-base font-bold text-white">Explorar Mapa com GPS</h3>
-            <p className="text-xs text-stone-300">84 atrativos com raio de proximidade</p>
+            <p className="text-xs text-stone-300">{activePlaces.length} locais publicados</p>
           </div>
         </div>
         <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white">
@@ -335,7 +324,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           </div>
           <div>
             <div className="text-sm font-bold text-stone-900">Como Chegar</div>
-            <div className="text-[11px] text-stone-500 leading-tight">Rotas e estacionamento</div>
+            <div className="text-[11px] text-stone-500 leading-tight">Consultar locais publicados</div>
           </div>
         </button>
 
@@ -349,12 +338,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           </div>
           <div>
             <div className="text-sm font-bold text-stone-900">Roteiros Prontos</div>
-            <div className="text-[11px] text-stone-500 leading-tight">1 dia ou fim de semana</div>
+            <div className="text-[11px] text-stone-500 leading-tight">Roteiros cadastrados</div>
           </div>
         </button>
       </div>
 
-      {/* 5. Audio Seresta Programação Banner matching Image 3 */}
+      {/* 5. Instrumental audio sample */}
       <div className="p-4 rounded-3xl bg-[#986815] text-white shadow-md flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
@@ -362,11 +351,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-xs font-bold uppercase tracking-wider">Ouvir a Seresta</span>
-              <span className="px-1.5 py-0.2 bg-amber-400 text-stone-950 text-[9px] font-black rounded">HOJE</span>
+              <span className="text-xs font-bold uppercase tracking-wider">Ouvir amostra instrumental</span>
             </div>
             <div className="text-[11px] text-amber-100 mt-0.5 line-clamp-1">
-              Itinerário das serenatas sob as janelas coloniais
+              Demonstração sintetizada; não é gravação de evento local.
             </div>
           </div>
         </div>
@@ -392,7 +380,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             onClick={() => onNavigateToTab('mapa')}
             className="text-xs font-bold text-[#0d3822] hover:underline"
           >
-            Ver tudo (7)
+            Ver mapa
           </button>
         </div>
 
@@ -411,7 +399,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                   <Icon className="w-5 h-5" />
                 </div>
                 <div className="text-xs font-bold text-stone-900">{cat.name}</div>
-                <div className="text-[10px] text-stone-400">{cat.count}</div>
+                <div className="text-[10px] text-stone-400">{activePlaces.filter((place) => place.category === cat.id).length} locais</div>
               </button>
             );
           })}
@@ -459,9 +447,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
         <div className="flex gap-3 overflow-x-auto no-scrollbar pb-1 -mx-4 px-4 snap-x">
           {categoryFilteredPlaces.map((place, idx) => {
-            const distance = userLocation && place.latitude && place.longitude
+            const hasCoordinates = hasVerifiedCoordinates(place);
+            const distance = userLocation && hasCoordinates
               ? calculateDistance(userLocation.lat, userLocation.lng, place.latitude, place.longitude)
-              : 180 + idx * 240;
+              : null;
+            const rating = getReviewSummary(reviews, place.id);
 
             return (
               <div
@@ -504,12 +494,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between text-white text-[10px] font-bold">
                       <div className="bg-black/60 backdrop-blur-sm px-2 py-0.5 rounded-full flex items-center gap-1">
                         <span>🚶</span>
-                        <span>{place.latitude && place.longitude ? formatDistance(distance) : 'Sem mapa'}</span>
+                        <span>{distance !== null ? formatDistance(distance) : hasCoordinates ? 'GPS indisponível' : 'Sem coordenadas'}</span>
                       </div>
-                      <div className="bg-black/60 backdrop-blur-sm px-2 py-0.5 rounded-full flex items-center gap-1 text-amber-300">
+                      {rating.rating !== null && <div className="bg-black/60 backdrop-blur-sm px-2 py-0.5 rounded-full flex items-center gap-1 text-amber-300">
                         <span>★</span>
-                        <span>{place.rating.toFixed(1)}</span>
-                      </div>
+                        <span>{rating.rating.toFixed(1)} ({rating.count})</span>
+                      </div>}
                     </div>
                   </div>
 
@@ -596,22 +586,22 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             Guia Colaborativo e Inteligente
           </h4>
           <p className="text-xs text-stone-600 mt-1 max-w-xs mx-auto leading-relaxed">
-            Mais de 80 pontos geolocalizados com rotas offline e informações checadas junto aos guias e moradores de Conservatória.
+            O catálogo mostra somente registros publicados. Coordenadas e rotas dependem de dados verificados e de serviços configurados.
           </p>
         </div>
 
         <div className="grid grid-cols-3 divide-x divide-stone-200 pt-2 border-t border-emerald-200/50">
           <div>
-            <div className="text-sm font-black text-[#0d3822]">100%</div>
-            <div className="text-[9px] font-bold text-stone-500 uppercase">Gratuito</div>
+            <div className="text-sm font-black text-[#0d3822]">{activePlaces.length}</div>
+            <div className="text-[9px] font-bold text-stone-500 uppercase">Locais publicados</div>
           </div>
           <div>
-            <div className="text-sm font-black text-[#0d3822]">84+</div>
-            <div className="text-[9px] font-bold text-stone-500 uppercase">Pontos</div>
+            <div className="text-sm font-black text-[#0d3822]">{activePlaces.filter(hasVerifiedCoordinates).length}</div>
+            <div className="text-[9px] font-bold text-stone-500 uppercase">Pontos verificados</div>
           </div>
           <div>
-            <div className="text-sm font-black text-[#0d3822]">GPS</div>
-            <div className="text-[9px] font-bold text-stone-500 uppercase">Ao Vivo</div>
+            <div className="text-sm font-black text-[#0d3822]">{gpsActive ? 'Ativo' : 'Desativado'}</div>
+            <div className="text-[9px] font-bold text-stone-500 uppercase">GPS do navegador</div>
           </div>
         </div>
       </div>
@@ -624,7 +614,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           </span>
           <h4 className="text-sm font-bold">Coloque seu negócio no mapa!</h4>
           <p className="text-[11px] text-emerald-100">
-            Pousadas, restaurantes, lojas e serviços a partir de R$ {settings.commercialPrice?.toFixed(2).replace('.', ',') || '29,90'}/mês.
+            Pousadas, restaurantes, lojas e serviços por R$ {(settings.commercialPrice || 49.9).toFixed(2).replace('.', ',')}/mês.
           </p>
         </div>
         <button
@@ -646,10 +636,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         <div className="flex items-center justify-center gap-1.5 text-xs font-bold text-stone-700">
           <span>Conservatória Turismo</span>
           <span>•</span>
-          <span>Capital da Seresta</span>
+          <span>Valença • RJ</span>
         </div>
         <p className="text-[11px] text-stone-500 max-w-xs mx-auto leading-relaxed">
-          Guia cultural e turístico oficial de Conservatória (Valença - RJ). Atrações históricas, serestas e mapas com GPS ao vivo.
+          Guia cultural e turístico de Conservatória. O mapa usa a localização do navegador somente após autorização.
         </p>
 
         {onOpenLegal && (

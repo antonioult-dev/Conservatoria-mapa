@@ -11,11 +11,13 @@ import {
   Heart,
   Compass
 } from 'lucide-react';
-import { Place } from '../types';
-import { calculateDistance, formatDistance } from '../services/store';
+import { Place, Review } from '../types';
+import { calculateDistance, formatDistance, getReviewSummary } from '../services/store';
+import { hasVerifiedCoordinates } from '../utils/location';
 
 interface LocalDetailsCardProps {
   place: Place;
+  reviews: Review[];
   userLocation: { lat: number; lng: number } | null;
   isFavorite: boolean;
   onToggleFavorite: (placeId: string) => void;
@@ -27,6 +29,7 @@ interface LocalDetailsCardProps {
 
 export const LocalDetailsCard: React.FC<LocalDetailsCardProps> = ({
   place,
+  reviews,
   userLocation,
   isFavorite,
   onToggleFavorite,
@@ -35,7 +38,8 @@ export const LocalDetailsCard: React.FC<LocalDetailsCardProps> = ({
   isPlayingAudio,
   onToggleAudio,
 }) => {
-  const hasCoordinates = typeof place.latitude === 'number' && typeof place.longitude === 'number' && !isNaN(place.latitude) && !isNaN(place.longitude);
+  const hasCoordinates = hasVerifiedCoordinates(place);
+  const rating = getReviewSummary(reviews, place.id);
 
   const distanceMeters = userLocation && hasCoordinates
     ? calculateDistance(userLocation.lat, userLocation.lng, place.latitude, place.longitude)
@@ -131,13 +135,11 @@ export const LocalDetailsCard: React.FC<LocalDetailsCardProps> = ({
 
           {/* Rating & Distance */}
           <div className="flex items-center gap-3 text-xs text-stone-600 flex-wrap">
-            {typeof place.rating === 'number' && place.rating > 0 && (
+            {rating.rating !== null && (
               <div className="flex items-center gap-1 font-bold text-amber-600">
                 <Star className="w-3.5 h-3.5 fill-amber-500 text-amber-500" />
-                <span>{place.rating.toFixed(1)}</span>
-                {place.reviewCount > 0 && (
-                  <span className="text-stone-400 font-normal">({place.reviewCount})</span>
-                )}
+                <span>{rating.rating.toFixed(1)}</span>
+                <span className="text-stone-400 font-normal">({rating.count})</span>
               </div>
             )}
 
@@ -173,7 +175,7 @@ export const LocalDetailsCard: React.FC<LocalDetailsCardProps> = ({
             </div>
           ) : (
             <div className="text-[10px] text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md inline-block font-semibold">
-              Coordenadas pendentes de homologação presencial
+              Coordenadas pendentes de verificação cadastral
             </div>
           )}
         </div>
@@ -190,7 +192,7 @@ export const LocalDetailsCard: React.FC<LocalDetailsCardProps> = ({
               {place.audioNarrationTitle || 'Narrativa Histórica com Seresta'}
             </div>
             <div className="text-[10px] text-amber-700 truncate">
-              Sonoridade com violão e cavaquinho de Conservatória
+              Amostra instrumental sintetizada pelo aplicativo
             </div>
           </div>
         </div>
@@ -220,8 +222,8 @@ export const LocalDetailsCard: React.FC<LocalDetailsCardProps> = ({
         <button
           onClick={handleComoChegar}
           disabled={!hasCoordinates}
-          aria-label="Abrir rota no Google Maps"
-          title="Abrir trajeto no Google Maps"
+          aria-label="Abrir navegação no Google Maps"
+          title="Abrir navegação externa no Google Maps"
           className="py-3 px-3 rounded-2xl bg-[#0d3822] hover:bg-[#144f31] disabled:opacity-50 text-white font-bold text-xs shadow-md flex items-center justify-center gap-1.5 transition active:scale-98 cursor-pointer"
         >
           <Navigation className="w-4 h-4" />

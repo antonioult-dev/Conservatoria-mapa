@@ -3,29 +3,30 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { lazy, Suspense, useState } from 'react';
 import { Sparkles } from 'lucide-react';
 import { AppProvider, useApp } from './services/store';
 import { Header } from './components/Header';
 import { BottomNav, TabType } from './components/BottomNav';
 import { HomeScreen } from './components/HomeScreen';
-import { InteractiveMap } from './components/InteractiveMap';
 import { RoutesScreen } from './components/RoutesScreen';
 import { FavoritesScreen } from './components/FavoritesScreen';
 import { PlaceDetailModal } from './components/PlaceDetailModal';
 import { EmergencyModal } from './components/EmergencyModal';
 import { UserModal } from './components/UserModal';
-import { MerchantHub } from './components/MerchantHub';
-import { AdminPanel } from './components/AdminPanel';
 import { OfflineIndicator } from './components/OfflineIndicator';
-import { GeminiChatModal } from './components/GeminiChatModal';
-import { GuidesScreen } from './components/GuidesScreen';
-import { GmailContactModal } from './components/GmailContactModal';
 import { LegalModal } from './components/LegalModal';
 import { Place, TouristRoute } from './types';
 
+const InteractiveMap = lazy(() => import('./components/InteractiveMap').then((module) => ({ default: module.InteractiveMap })));
+const MerchantHub = lazy(() => import('./components/MerchantHub').then((module) => ({ default: module.MerchantHub })));
+const AdminPanel = lazy(() => import('./components/AdminPanel').then((module) => ({ default: module.AdminPanel })));
+const GeminiChatModal = lazy(() => import('./components/GeminiChatModal').then((module) => ({ default: module.GeminiChatModal })));
+const GuidesScreen = lazy(() => import('./components/GuidesScreen').then((module) => ({ default: module.GuidesScreen })));
+const GmailContactModal = lazy(() => import('./components/GmailContactModal').then((module) => ({ default: module.GmailContactModal })));
+
 function MainLayout() {
-  const { selectedPlace, setSelectedPlace, currentUser } = useApp();
+  const { selectedPlace, setSelectedPlace, currentUser, connectionError } = useApp();
 
   const [activeTab, setActiveTab] = useState<TabType>('inicio');
   const [isEmergencyOpen, setIsEmergencyOpen] = useState(false);
@@ -86,6 +87,7 @@ function MainLayout() {
   };
 
   return (
+    <Suspense fallback={<div className="min-h-[40vh] p-8 text-center text-sm text-stone-600">Carregando…</div>}>
     <div className="min-h-screen bg-[#f7f5f0] text-stone-900 flex flex-col font-sans selection:bg-[#0d3822] selection:text-white">
       {/* Offline Status Warning */}
       <OfflineIndicator />
@@ -102,6 +104,14 @@ function MainLayout() {
         onOpenChat={() => handleOpenChat()}
         onOpenGmailContact={() => setIsGmailModalOpen(true)}
       />
+
+      {connectionError && (
+        <div className="mx-auto w-full max-w-3xl px-4 pt-3" role="alert">
+          <div className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-950">
+            {connectionError}
+          </div>
+        </div>
+      )}
 
       {/* Main Content Area */}
       <main className="flex-1 w-full relative">
@@ -224,20 +234,20 @@ function MainLayout() {
       )}
 
       {/* Gemini Chatbot Modal */}
-      <GeminiChatModal
+      {isChatOpen && <GeminiChatModal
         isOpen={isChatOpen}
         onClose={() => {
           setIsChatOpen(false);
           setChatInitialPrompt(undefined);
         }}
         initialPrompt={chatInitialPrompt}
-      />
+      />}
 
       {/* Gmail Contact & Suggestions Modal */}
-      <GmailContactModal
+      {isGmailModalOpen && <GmailContactModal
         isOpen={isGmailModalOpen}
         onClose={() => setIsGmailModalOpen(false)}
-      />
+      />}
 
       {/* Terms of Use & Privacy Policy Modal */}
       <LegalModal
@@ -246,6 +256,7 @@ function MainLayout() {
         initialTab={legalTab}
       />
     </div>
+    </Suspense>
   );
 }
 
