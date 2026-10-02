@@ -74,7 +74,7 @@ function isWithinRateLimit(key: string, maxRequests: number, windowMs: number): 
 
 app.post('/api/auth/admin-claim', async (req, res) => {
   const adminAuth = serverAdminAuth;
-  if (!adminAuth || !process.env.ADMIN_EMAILS?.split(',').some((email) => email.trim())) {
+  if (!adminAuth) {
     return res.status(503).json({ error: 'Administração não configurada. O servidor precisa de FIREBASE_SERVICE_ACCOUNT_JSON válido e ADMIN_EMAILS.' });
   }
   const address = req.ip || req.socket.remoteAddress || 'unknown';
@@ -92,11 +92,27 @@ app.post('/api/auth/admin-claim', async (req, res) => {
   }
   const email = (decoded.email || '').trim().toLowerCase();
   const allowedAdmins = (process.env.ADMIN_EMAILS || '').split(',').map((value) => value.trim().toLowerCase()).filter(Boolean);
-  if (decoded.firebase?.sign_in_provider !== 'google.com' || decoded.email_verified !== true || !allowedAdmins.includes(email)) {
-    return res.status(403).json({ error: 'Esta conta Google verificada não está autorizada como administradora.' });
-  }
   try {
     const user = await adminAuth.getUser(decoded.uid);
+    const isAuthorized = decoded.firebase?.sign_in_provider === 'google.com'
+      && decoded.email_verified === true
+      && allowedAdmins.includes(email);
+    if (!isAuthorized) {
+      // Remove a custom claim if an administrator was removed from ADMIN_EMAILS.
+      // Preserve unrelated claims and revoke refresh tokens to prevent restoring
+      // the old privilege through an existing refresh session.
+      if (user.customClaims?.admin === true) {
+        const { admin: _admin, ...otherClaims } = user.customClaims;
+        await adminAuth.setCustomUserClaims(decoded.uid, otherClaims);
+        await adminAuth.revokeRefreshTokens(decoded.uid);
+      }
+      const status = allowedAdmins.length === 0 ? 503 : 403;
+      return res.status(status).json({
+        error: allowedAdmins.length === 0
+          ? 'Administração não configurada. Configure ADMIN_EMAILS no servidor.'
+          : 'Esta conta Google verificada não está autorizada como administradora.',
+      });
+    }
     await adminAuth.setCustomUserClaims(decoded.uid, { ...user.customClaims, admin: true });
     return res.json({ success: true });
   } catch {

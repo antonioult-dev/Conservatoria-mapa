@@ -3,6 +3,7 @@ import { Route as RouteIcon, Clock, Navigation, CheckCircle, ChevronRight, MapPi
 import { useApp } from '../services/store';
 import { TouristRoute, Place } from '../types';
 import { hasVerifiedCoordinates } from '../utils/location';
+import { PlaceImage } from './PlaceImage';
 
 interface RoutesScreenProps {
   onStartRoute: (route: TouristRoute, initialPlace?: Place) => void;
@@ -24,7 +25,8 @@ export const RoutesScreen: React.FC<RoutesScreenProps> = ({
   // Resolve places for the active route
   const routePlaces: Place[] = activeRoute
     ? activeRoute.places
-        .map((pId) => places.find((p) => p.id === pId))
+        .map((placeReference) => places.find((place) => place.id === placeReference)
+          || places.find((place) => place.name.trim().toLocaleLowerCase('pt-BR') === placeReference.trim().toLocaleLowerCase('pt-BR')))
         .filter((p): p is Place => !!p)
     : [];
 
@@ -150,11 +152,7 @@ export const RoutesScreen: React.FC<RoutesScreenProps> = ({
                       <div className="w-7 h-7 rounded-full bg-[#0d3822] text-white text-xs font-bold flex items-center justify-center flex-shrink-0">
                         {idx + 1}
                       </div>
-                      <img
-                        src={place.imageUrl}
-                        alt={place.name}
-                        className="w-12 h-12 rounded-xl object-cover flex-shrink-0"
-                      />
+                      <PlaceImage src={place.imageUrl} alt={place.name} className="w-12 h-12 rounded-xl object-cover flex-shrink-0" />
                       <div className="min-w-0">
                         <h5 className="text-xs font-bold text-stone-900 truncate">
                           {place.name}

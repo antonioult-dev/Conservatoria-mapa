@@ -24,10 +24,12 @@ import { toggleSerestaAudio } from '../services/audioService';
 import { LocalDetailsCard } from './LocalDetailsCard';
 import { PlacesListDrawer } from './PlacesListDrawer';
 import { hasVerifiedCoordinates } from '../utils/location';
+import { PlaceImage } from './PlaceImage';
 
 interface InteractiveMapProps {
   onOpenDetails: (place: Place) => void;
   onOpenSearch?: () => void;
+  onRequestLogin?: () => void;
 }
 
 // Category filter type
@@ -54,12 +56,14 @@ const escapeHtml = (value: string) => value.replace(/[&<>"']/g, (character) => (
 
 export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   onOpenDetails,
+  onRequestLogin,
 }) => {
   const {
     places,
     routes,
     reviews,
     selectedPlace,
+    currentUser,
     setSelectedPlace,
     userLocation,
     requestGpsPermission,
@@ -715,12 +719,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                     onClick={() => handleSelectSearchResult(place)}
                     className="p-3 flex items-center gap-3 hover:bg-stone-50 cursor-pointer transition active:bg-stone-100"
                   >
-                    <img
-                      src={place.imageUrl}
-                      alt={place.name}
-                      className="w-11 h-11 rounded-xl object-cover flex-shrink-0 bg-stone-100 shadow-inner"
-                      loading="lazy"
-                    />
+                    <PlaceImage src={place.imageUrl} alt={place.name} className="w-11 h-11 rounded-xl object-cover flex-shrink-0 bg-stone-100 shadow-inner" />
                     <div className="flex-1 min-w-0">
                       <div className="text-xs font-bold text-stone-900 truncate">
                         {place.name}
@@ -948,11 +947,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                   }}
                   className="p-2.5 rounded-2xl border border-stone-200 hover:bg-stone-50 flex items-center gap-3 cursor-pointer transition"
                 >
-                  <img
-                    src={place.imageUrl}
-                    alt={place.name}
-                    className="w-11 h-11 rounded-xl object-cover flex-shrink-0 shadow-inner"
-                  />
+                  <PlaceImage src={place.imageUrl} alt={place.name} className="w-11 h-11 rounded-xl object-cover flex-shrink-0 shadow-inner" />
                   <div className="min-w-0 flex-1">
                     <div className="text-xs font-bold text-stone-900 truncate">
                       {place.name}
@@ -983,6 +978,8 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
             userLocation={userLocation}
             isFavorite={isFavorite(selectedPlace.id)}
             onToggleFavorite={toggleFavorite}
+            isAuthenticated={Boolean(currentUser)}
+            onRequestLogin={onRequestLogin}
             onOpenDetails={onOpenDetails}
             onClose={() => setSelectedPlace(null)}
             isPlayingAudio={isPlayingAudio}

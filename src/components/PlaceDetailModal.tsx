@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
   X, 
   MapPin, 
@@ -17,26 +17,32 @@ import {
   AlertCircle,
   CheckCircle2, 
   MessageCircle,
-  ExternalLink
+  ExternalLink,
+  Mail
 } from 'lucide-react';
 import { useApp, calculateDistance, formatDistance, getReviewSummary } from '../services/store';
 import { Place } from '../types';
 import { toggleSerestaAudio } from '../services/audioService';
 import { hasVerifiedCoordinates } from '../utils/location';
+import { PlaceImage } from './PlaceImage';
+import { getSafeHttpUrl } from '../utils/safeUrl';
 
 interface PlaceDetailModalProps {
   place: Place | null;
   onClose: () => void;
   onStartRoute: (place: Place) => void;
+  onRequestLogin?: () => void;
 }
 
 export const PlaceDetailModal: React.FC<PlaceDetailModalProps> = ({
   place,
   onClose,
   onStartRoute,
+  onRequestLogin,
 }) => {
   const {
     userLocation,
+    currentUser,
     isFavorite,
     toggleFavorite,
     reviews,
@@ -62,9 +68,14 @@ export const PlaceDetailModal: React.FC<PlaceDetailModalProps> = ({
   const [reportSuccess, setReportSuccess] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
+  useEffect(() => {
+    setActivePhoto(place?.imageUrl || '');
+  }, [place?.id, place?.imageUrl]);
+
   if (!place) return null;
 
   const hasCoordinates = hasVerifiedCoordinates(place);
+  const websiteUrl = getSafeHttpUrl(place.website);
   const distance = userLocation && hasCoordinates
     ? calculateDistance(userLocation.lat, userLocation.lng, place.latitude, place.longitude)
     : null;
@@ -151,11 +162,7 @@ export const PlaceDetailModal: React.FC<PlaceDetailModalProps> = ({
       <div className="w-full max-w-lg max-h-[92vh] overflow-y-auto bg-white rounded-3xl shadow-2xl border border-stone-200 text-stone-900 relative">
         {/* Sticky Header with Close & Favorite Buttons */}
         <div className="relative h-64 sm:h-72 w-full bg-stone-100">
-          <img
-            src={activePhoto || place.imageUrl}
-            alt={place.name}
-            className="w-full h-full object-cover"
-          />
+          <PlaceImage src={activePhoto || place.imageUrl} alt={place.name} className="w-full h-full object-cover" />
 
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
 
@@ -178,7 +185,7 @@ export const PlaceDetailModal: React.FC<PlaceDetailModalProps> = ({
                 <Share2 className="w-4 h-4" />
               </button>
               <button
-                onClick={() => toggleFavorite(place.id)}
+                onClick={() => currentUser ? void toggleFavorite(place.id) : onRequestLogin?.()}
                 aria-label="Favoritar"
                 className="w-10 h-10 rounded-full bg-black/50 backdrop-blur-md text-white flex items-center justify-center hover:bg-black/70 active:scale-95 transition"
               >
@@ -380,6 +387,16 @@ export const PlaceDetailModal: React.FC<PlaceDetailModalProps> = ({
                 </a>
               )}
 
+              {place.email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(place.email) && (
+                <a
+                  href={`mailto:${place.email}`}
+                  className="py-2.5 px-3 rounded-xl bg-blue-700 hover:bg-blue-800 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition"
+                >
+                  <Mail className="w-4 h-4" />
+                  <span>E-mail</span>
+                </a>
+              )}
+
               {place.instagram && (
                 <a
                   href={`https://instagram.com/${place.instagram.replace('@', '')}`}
@@ -392,9 +409,9 @@ export const PlaceDetailModal: React.FC<PlaceDetailModalProps> = ({
                 </a>
               )}
 
-              {place.website && (
+              {websiteUrl && (
                 <a
-                  href={place.website}
+                  href={websiteUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="py-2.5 px-3 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-800 text-xs font-bold flex items-center justify-center gap-1.5 border border-stone-200 active:scale-95 transition"
@@ -406,7 +423,7 @@ export const PlaceDetailModal: React.FC<PlaceDetailModalProps> = ({
             </div>
 
             {/* Fallback when no contacts are available */}
-            {!place.whatsapp && !place.phone && !place.instagram && !place.website && (
+            {!place.whatsapp && !place.phone && !(place.email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(place.email)) && !place.instagram && !websiteUrl && (
               <div className="p-2.5 rounded-xl bg-stone-50 border border-stone-200 text-xs text-stone-500 text-center">
                 Contatos: Informação não cadastrada.
               </div>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
   Store, 
   CheckCircle2, 
@@ -51,14 +51,41 @@ export const MerchantHub: React.FC<MerchantHubProps> = ({
   const [whatsapp, setWhatsapp] = useState('');
   const [category, setCategory] = useState<PlaceCategory>('gastronomia');
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [flowError, setFlowError] = useState('');
 
   const handleMerchantGoogleAuth = async () => {
     setGoogleLoading(true);
-    const res = await loginWithGoogle('COMERCIANTE');
-    setGoogleLoading(false);
-    if (res.success && res.user) {
-      setResponsibleName(res.user.name);
-      setEmail(res.user.email);
+    setFlowError('');
+    try {
+      const res = await loginWithGoogle('COMERCIANTE');
+      if (res.success && res.user) {
+        setResponsibleName(res.user.name);
+        setEmail(res.user.email);
+      } else {
+        setFlowError(res.error || 'Não foi possível conectar com o Google.');
+      }
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
+
+  const handleExistingMerchantAccess = async () => {
+    setFlowError('');
+    setGoogleLoading(true);
+    try {
+      const result = currentUser ? { success: true, user: currentUser } : await loginWithGoogle('TURISTA');
+      if (!result.success || !result.user) {
+        setFlowError(result.error || 'Entre com a mesma Conta Google usada no cadastro do negócio.');
+        return;
+      }
+      if (result.user.role !== 'COMERCIANTE') {
+        setFlowError('Não encontramos um negócio vinculado a esta conta. Você pode iniciar um novo cadastro.');
+        setViewState('register');
+        return;
+      }
+      setViewState('dashboard');
+    } finally {
+      setGoogleLoading(false);
     }
   };
 
@@ -75,11 +102,29 @@ export const MerchantHub: React.FC<MerchantHubProps> = ({
   const [editHours, setEditHours] = useState(merchantBusiness?.hours || '');
   const [editPhone, setEditPhone] = useState(merchantBusiness?.phone || '');
   const [editWhatsapp, setEditWhatsapp] = useState(merchantBusiness?.whatsapp || '');
+  const [editEmail, setEditEmail] = useState(merchantBusiness?.email || '');
   const [editInstagram, setEditInstagram] = useState(merchantBusiness?.instagram || '');
   const [editWebsite, setEditWebsite] = useState(merchantBusiness?.website || '');
   const [editImageUrl, setEditImageUrl] = useState(merchantBusiness?.imageUrl || '');
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [saveError, setSaveError] = useState('');
+
+  useEffect(() => {
+    if (viewState === 'landing' && currentUser?.role === 'COMERCIANTE') setViewState('dashboard');
+  }, [currentUser?.role, viewState]);
+
+  useEffect(() => {
+    if (!merchantBusiness) return;
+    setEditDesc(merchantBusiness.description || '');
+    setEditAddress(merchantBusiness.address || '');
+    setEditHours(merchantBusiness.hours || '');
+    setEditPhone(merchantBusiness.phone || '');
+    setEditWhatsapp(merchantBusiness.whatsapp || '');
+    setEditEmail(merchantBusiness.email || '');
+    setEditInstagram(merchantBusiness.instagram || '');
+    setEditWebsite(merchantBusiness.website || '');
+    setEditImageUrl(merchantBusiness.imageUrl || '');
+  }, [merchantBusiness?.id]);
 
   // Handle register merchant
   const handleRegister = async (e: React.FormEvent) => {
@@ -97,7 +142,7 @@ export const MerchantHub: React.FC<MerchantHubProps> = ({
       category,
       });
     } catch (error) {
-      window.alert(error instanceof Error ? error.message : 'Não foi possível cadastrar o negócio.');
+      setFlowError(error instanceof Error ? error.message : 'Não foi possível cadastrar o negócio.');
       return;
     }
 
@@ -118,9 +163,10 @@ export const MerchantHub: React.FC<MerchantHubProps> = ({
       hours: editHours,
       phone: editPhone,
       whatsapp: editWhatsapp,
+      email: editEmail,
       instagram: editInstagram,
       website: editWebsite,
-      imageUrl: editImageUrl || merchantBusiness.imageUrl,
+      imageUrl: editImageUrl,
     }); } catch (error) { setSaveError(error instanceof Error ? error.message : 'Não foi possível salvar as alterações.'); return; }
 
     setSaveSuccess(true);
@@ -196,6 +242,7 @@ export const MerchantHub: React.FC<MerchantHubProps> = ({
               <span>QUERO CADASTRAR MEU NEGÓCIO</span>
               <ArrowRight className="w-4 h-4" />
             </button>
+            {flowError && <p role="alert" className="mt-2 rounded-xl bg-red-50 p-3 text-xs text-red-800">{flowError}</p>}
           </div>
 
           {/* Already have an account */}
@@ -213,6 +260,7 @@ export const MerchantHub: React.FC<MerchantHubProps> = ({
       {/* 2. Merchant Registration Form */}
       {viewState === 'register' && (
         <form onSubmit={handleRegister} className="p-5 rounded-3xl bg-white border border-stone-200 shadow-sm space-y-4 animate-in fade-in">
+          {flowError && <p role="alert" className="rounded-xl bg-red-50 p-3 text-xs text-red-800">{flowError}</p>}
           <div>
             <span className="text-[10px] font-bold text-[#0d3822] uppercase tracking-wider">
               Passo 1 de 2
@@ -255,6 +303,7 @@ export const MerchantHub: React.FC<MerchantHubProps> = ({
               </label>
               <input
                 type="text"
+                maxLength={120}
                 required
                 value={responsibleName}
                 onChange={(e) => setResponsibleName(e.target.value)}
@@ -269,6 +318,7 @@ export const MerchantHub: React.FC<MerchantHubProps> = ({
               </label>
               <input
                 type="text"
+                maxLength={120}
                 required
                 value={businessName}
                 onChange={(e) => setBusinessName(e.target.value)}
@@ -301,6 +351,7 @@ export const MerchantHub: React.FC<MerchantHubProps> = ({
                 </label>
                 <input
                   type="email"
+                  maxLength={254}
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -315,6 +366,7 @@ export const MerchantHub: React.FC<MerchantHubProps> = ({
                 </label>
                 <input
                   type="text"
+                  maxLength={40}
                   required
                   value={whatsapp}
                   onChange={(e) => setWhatsapp(e.target.value)}
@@ -330,6 +382,7 @@ export const MerchantHub: React.FC<MerchantHubProps> = ({
               </label>
               <input
                 type="text"
+                maxLength={30}
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 placeholder="(DD) 0000-0000"
@@ -382,6 +435,12 @@ export const MerchantHub: React.FC<MerchantHubProps> = ({
       {/* 4. Merchant Dashboard (MEU NEGÓCIO) */}
       {viewState === 'dashboard' && (
         <div className="space-y-4 animate-in fade-in">
+          {!merchantBusiness && !currentUser?.merchantBusinessId && (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-950">
+              <p>Não encontramos um cadastro de negócio carregado para esta conta. Confirme se entrou com a Conta Google usada no cadastro.</p>
+              <button type="button" onClick={() => setViewState('register')} className="mt-3 font-bold underline">Iniciar cadastro do negócio</button>
+            </div>
+          )}
           {/* Header Status */}
           <div className="p-5 rounded-3xl bg-white border border-stone-200 shadow-sm space-y-3">
             <div className="flex items-start justify-between">
@@ -480,6 +539,7 @@ export const MerchantHub: React.FC<MerchantHubProps> = ({
                   </label>
                   <input
                     type="url"
+                    maxLength={2048}
                     value={editImageUrl}
                     onChange={(e) => setEditImageUrl(e.target.value)}
                     placeholder="https://..."
@@ -500,6 +560,7 @@ export const MerchantHub: React.FC<MerchantHubProps> = ({
                   </label>
                   <textarea
                     rows={3}
+                    maxLength={4000}
                     value={editDesc}
                     onChange={(e) => setEditDesc(e.target.value)}
                     className="w-full text-xs p-2.5 rounded-xl border border-stone-300 focus:outline-none focus:ring-2 focus:ring-[#0d3822]"
@@ -512,6 +573,7 @@ export const MerchantHub: React.FC<MerchantHubProps> = ({
                   </label>
                   <input
                     type="text"
+                    maxLength={300}
                     value={editAddress}
                     onChange={(e) => setEditAddress(e.target.value)}
                     className="w-full text-xs p-2.5 rounded-xl border border-stone-300 focus:outline-none focus:ring-2 focus:ring-[#0d3822]"
@@ -526,6 +588,7 @@ export const MerchantHub: React.FC<MerchantHubProps> = ({
                     </label>
                     <input
                       type="text"
+                      maxLength={40}
                       value={editWhatsapp}
                       onChange={(e) => setEditWhatsapp(e.target.value)}
                       className="w-full text-xs p-2.5 rounded-xl border border-stone-300 focus:outline-none focus:ring-2 focus:ring-[#0d3822]"
@@ -537,6 +600,7 @@ export const MerchantHub: React.FC<MerchantHubProps> = ({
                     </label>
                     <input
                       type="text"
+                      maxLength={80}
                       value={editInstagram}
                       onChange={(e) => setEditInstagram(e.target.value)}
                       className="w-full text-xs p-2.5 rounded-xl border border-stone-300 focus:outline-none focus:ring-2 focus:ring-[#0d3822]"
@@ -545,11 +609,34 @@ export const MerchantHub: React.FC<MerchantHubProps> = ({
                 </div>
 
                 <div>
+                  <label className="block text-xs font-bold text-stone-700 mb-1">Telefone comercial:</label>
+                  <input
+                    type="tel"
+                    maxLength={40}
+                    value={editPhone}
+                    onChange={(e) => setEditPhone(e.target.value)}
+                    className="w-full text-xs p-2.5 rounded-xl border border-stone-300 focus:outline-none focus:ring-2 focus:ring-[#0d3822]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-stone-700 mb-1">E-mail comercial:</label>
+                  <input
+                    type="email"
+                    maxLength={254}
+                    value={editEmail}
+                    onChange={(e) => setEditEmail(e.target.value)}
+                    className="w-full text-xs p-2.5 rounded-xl border border-stone-300 focus:outline-none focus:ring-2 focus:ring-[#0d3822]"
+                  />
+                </div>
+
+                <div>
                   <label className="block text-xs font-bold text-stone-700 mb-1">
                     Horário de Funcionamento:
                   </label>
                   <input
                     type="text"
+                    maxLength={300}
                     value={editHours}
                     onChange={(e) => setEditHours(e.target.value)}
                     className="w-full text-xs p-2.5 rounded-xl border border-stone-300 focus:outline-none focus:ring-2 focus:ring-[#0d3822]"

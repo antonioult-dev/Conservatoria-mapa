@@ -9,7 +9,7 @@ O frontend é compilado pelo Vite e o script `build:vercel` copia o resultado de
 ## Configuração do projeto Vercel
 
 1. Importe a branch de trabalho do repositório e deixe o Root Directory na raiz do projeto.
-2. Use o preset **Express** e Node.js **24.x** (ou 22.x com versão mínima 22.18). `vercel.json` seleciona Express e define o build `pnpm run build:vercel`.
+2. Use o preset **Express** e Node.js **24.x** (22.x a partir de 22.18 também atende ao projeto). `package.json` limita a faixa a `<25`; `vercel.json` seleciona Express e define o build `pnpm run build:vercel`.
 3. Mantenha PNPM como único gerenciador: `bun.lock` foi removido porque a Vercel prioriza esse lockfile quando há mais de um; `pnpm-lock.yaml` (formato 9) é a fonte versionada. `package.json` declara `pnpm@9.15.5`. Não defina um Output Directory estático.
 4. Configure as variáveis de build e runtime abaixo nos ambientes Preview e Production. Variáveis `VITE_*` são incorporadas no bundle durante o build e são públicas; as demais listadas como servidor ficam somente no ambiente da Function.
 5. Em cada Firebase Authentication do projeto, habilite Google e inclua o domínio Vercel de produção, o domínio personalizado e os domínios de Preview que serão usados em **Authentication → Settings → Authorized domains**. Cadastre Preview domains individualmente. Confirme também o e-mail de suporte do provedor Google.

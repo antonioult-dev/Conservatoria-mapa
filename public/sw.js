@@ -4,10 +4,10 @@
  * de funcionamento dos links telefônicos (tel:) da Central de Emergência.
  */
 
-const CACHE_NAME = 'conservatoria-pwa-v1.2';
+const CACHE_NAME = 'conservatoria-pwa-v1.3';
 const EMERGENCY_CACHE = 'conservatoria-emergency-v1';
 
-// Arquivos essenciais pré-armazenados para inicialização 100% offline
+// Arquivos locais usados para a tela inicial e a Central SOS offline.
 const PRECACHE_ASSETS = [
   '/',
   '/index.html',
@@ -15,9 +15,7 @@ const PRECACHE_ASSETS = [
   '/icon.svg',
   '/icon-192.png',
   '/icon-512.png',
-  '/offline-emergency.html',
-  'https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800&family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,400&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap',
-  'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'
+  '/offline-emergency.html'
 ];
 
 // Base de contatos de emergência servida offline sem conexão à internet
@@ -94,13 +92,9 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
-  // CRÍTICO: Protocolos de discagem telefônica (tel:), SMS e e-mails nunca devem ser interceptados
-  // Isso garante que os links da Central de Emergência (tel:190, tel:180, tel:192, tel:193)
-  // abram imediatamente o discador nativo do smartphone mesmo offline sem sinal de dados.
+  // Nunca intercepte requisições externas, ações de escrita ou protocolos do sistema.
   if (
-    url.protocol === 'tel:' ||
-    url.protocol === 'mailto:' ||
-    url.protocol === 'sms:' ||
+    url.origin !== self.location.origin ||
     event.request.method !== 'GET'
   ) {
     return;
@@ -117,6 +111,12 @@ self.addEventListener('fetch', (event) => {
     );
     return;
   }
+
+  // Não armazene respostas de API/Firebase ou documentos privados no Cache Storage.
+  const isStaticAsset = url.pathname.startsWith('/assets/') || [
+    '/manifest.json', '/icon.svg', '/icon-192.png', '/icon-512.png', '/offline-emergency.html', '/sw.js',
+  ].includes(url.pathname);
+  if (!isStaticAsset && event.request.mode !== 'navigate') return;
 
   // Navegações de página (HTML): Network-First com fallback para a aplicação em cache ou página de emergência
   if (event.request.mode === 'navigate') {
@@ -175,11 +175,11 @@ self.addEventListener('fetch', (event) => {
           return networkResponse;
         })
         .catch(() => {
-          // Caso de imagens offline: retorna vazio para evitar quebrar layout
+          // Imagens usam o ícone local; outros arquivos ausentes falham explicitamente.
           if (event.request.destination === 'image') {
             return caches.match('/icon.svg');
           }
-          return null;
+          return Response.error();
         });
     })
   );

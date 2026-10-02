@@ -12,7 +12,7 @@ O build gera `dist/`; `start` serve o frontend e a API Express na mesma origem. 
 
 ## Antes de publicar
 
-0. Use Node.js 22.18 ou mais recente; o build usa o carregador nativo do Vite e o servidor executa `server.ts` com o suporte nativo do Node a TypeScript.
+0. Use Node.js 22.18 ou 24.x; o projeto limita `engines.node` a `<25` para evitar mudanças automáticas para uma nova versão principal. O build usa o carregador nativo do Vite e o servidor executa `server.ts` com o suporte nativo do Node a TypeScript.
 1. No Firebase Console, selecione o projeto indicado pelo `projectId` do arquivo `firebase-applet-config.json` (ou configure `VITE_FIREBASE_PROJECT_ID` para outro projeto).
 2. Em **Authentication → Sign-in method**, habilite **Google** e escolha o e-mail de suporte do projeto.
 3. Em **Authentication → Settings → Authorized domains**, cadastre o domínio final do app e os domínios de preview necessários. Não use domínios de preview como domínio de produção.

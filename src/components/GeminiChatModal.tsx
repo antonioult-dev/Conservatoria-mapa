@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { getSafeHttpUrl } from '../utils/safeUrl';
 import {
   Sparkles,
   X,
@@ -307,12 +308,14 @@ export const GeminiChatModal: React.FC<GeminiChatModalProps> = ({
                         {m.groundingMetadata.groundingChunks.map((chunk, idx) => {
                           const item = chunk.web || chunk.maps;
                           if (!item) return null;
+                          const sourceUrl = getSafeHttpUrl(item.uri);
+                          if (!sourceUrl) return null;
                           return (
                             <a
                               key={idx}
-                              href={item.uri}
+                              href={sourceUrl}
                               target="_blank"
-                              rel="noreferrer"
+                              rel="noopener noreferrer"
                               className="bg-emerald-50 text-emerald-800 hover:underline px-2 py-0.5 rounded-md inline-flex items-center gap-1"
                             >
                               <span>{item.title || 'Ver fonte'}</span>

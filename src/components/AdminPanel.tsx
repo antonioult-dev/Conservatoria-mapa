@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
   ShieldCheck, 
   Users, 
@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '../services/store';
 import { Place, BusinessStatus, TouristRoute } from '../types';
+import { PlaceImage } from './PlaceImage';
 
 interface AdminPanelProps {
   onBackToApp: () => void;
@@ -43,6 +44,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToApp, onOpenDetai
     deleteRoute,
     reviews,
     deleteReview,
+    setReviewHidden,
     reports,
     resolveReport,
     payments,
@@ -57,6 +59,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToApp, onOpenDetai
   // Login form state if not authenticated as SUPER_ADMIN
   const [loginError, setLoginError] = useState('');
   const [placeFormError, setPlaceFormError] = useState('');
+  const [reviewActionError, setReviewActionError] = useState('');
 
   // Active admin tab
   const [activeTab, setActiveTab] = useState<
@@ -87,6 +90,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToApp, onOpenDetai
   const [bannerHeadline, setBannerHeadline] = useState(settings.bannerHeadline);
   const [bannerSubtext, setBannerSubtext] = useState(settings.bannerSubtext);
   const [savedSettingsSuccess, setSavedSettingsSuccess] = useState(false);
+
+  useEffect(() => {
+    setAppName(settings.appName);
+    setBannerHeadline(settings.bannerHeadline);
+    setBannerSubtext(settings.bannerSubtext);
+  }, [settings.appName, settings.bannerHeadline, settings.bannerSubtext]);
 
   const isSuperAdmin = currentUser?.role === 'SUPER_ADMIN';
 
@@ -278,6 +287,25 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToApp, onOpenDetai
     }
   };
 
+  const handleToggleReviewVisibility = async (reviewId: string, hidden: boolean) => {
+    setReviewActionError('');
+    try {
+      await setReviewHidden(reviewId, hidden);
+    } catch {
+      setReviewActionError('Não foi possível atualizar a visibilidade desta avaliação.');
+    }
+  };
+
+  const handleRemoveReview = async (reviewId: string) => {
+    if (!window.confirm('Excluir esta avaliação permanentemente?')) return;
+    setReviewActionError('');
+    try {
+      await deleteReview(reviewId);
+    } catch {
+      setReviewActionError('Não foi possível excluir esta avaliação.');
+    }
+  };
+
   return (
     <div className="max-w-md mx-auto px-4 pt-3 pb-24 space-y-4">
       {/* Admin Top Bar */}
@@ -315,6 +343,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToApp, onOpenDetai
           { id: 'restaurantes', label: `Restaurantes (${restaurantsCount})` },
           { id: 'negocios', label: `Comércio (${totalBusinesses.length})` },
           { id: 'guias', label: `Guias (${guides.length})` },
+          { id: 'avaliacoes', label: `Avaliações (${reviews.length})` },
           { id: 'denuncias', label: `Denúncias (${pendingReportsCount})` },
           { id: 'pagamentos', label: 'Pagamentos' },
           { id: 'configuracoes', label: 'Configurações' },
@@ -463,7 +492,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToApp, onOpenDetai
                   className="p-3 rounded-2xl bg-white border border-stone-200/90 shadow-2xs flex items-center justify-between gap-2"
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
-                    <img src={place.imageUrl} alt={place.name} className="w-12 h-12 rounded-xl object-cover flex-shrink-0" />
+                    <PlaceImage src={place.imageUrl} alt={place.name} className="w-12 h-12 rounded-xl object-cover flex-shrink-0" />
                     <div className="min-w-0">
                       <div className="text-xs font-bold text-stone-900 truncate">{place.name}</div>
                       <div className="text-[10px] text-stone-500 truncate">{place.address}</div>
@@ -608,7 +637,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToApp, onOpenDetai
 
           {reports.length === 0 ? (
             <div className="p-6 rounded-2xl bg-white border border-stone-200 text-center text-xs text-stone-500">
-              Nenhuma denúncia pendente. Todos os locais estão verificados.
+              Nenhuma denúncia pendente no momento.
             </div>
           ) : (
             <div className="space-y-2">
@@ -638,6 +667,46 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBackToApp, onOpenDetai
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {activeTab === 'avaliacoes' && (
+        <div className="space-y-3 animate-in fade-in">
+          <div>
+            <h3 className="text-lg font-bold text-stone-900">Moderação de Avaliações</h3>
+            <p className="text-xs text-stone-500">Avaliações ocultas não aparecem para visitantes, mas continuam disponíveis aqui para revisão.</p>
+          </div>
+          {reviewActionError && <p role="alert" className="rounded-xl bg-red-50 p-3 text-xs text-red-800">{reviewActionError}</p>}
+          {reviews.length === 0 ? (
+            <div className="rounded-2xl border border-stone-200 bg-white p-4 text-sm text-stone-600">Nenhuma avaliação foi registrada.</div>
+          ) : reviews.map((review) => {
+            const placeName = places.find((place) => place.id === review.placeId)?.name || 'Local removido ou indisponível';
+            const date = new Date(review.createdAt);
+            const formattedDate = Number.isNaN(date.getTime()) ? 'Data indisponível' : date.toLocaleDateString('pt-BR');
+            return (
+              <article key={review.id} className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm space-y-2">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <h4 className="text-sm font-bold text-stone-900 truncate">{placeName}</h4>
+                    <p className="text-[11px] text-stone-500">{review.userName} · {formattedDate}</p>
+                  </div>
+                  <span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-bold ${review.hidden ? 'bg-stone-200 text-stone-700' : 'bg-emerald-100 text-emerald-800'}`}>
+                    {review.hidden ? 'Oculta' : 'Pública'}
+                  </span>
+                </div>
+                <div aria-label={`${review.rating} de 5 estrelas`} className="text-amber-600">{'★'.repeat(Math.max(0, Math.min(5, review.rating)))}</div>
+                <p className="whitespace-pre-wrap break-words text-xs text-stone-700">{review.comment}</p>
+                <div className="flex gap-2 pt-1">
+                  <button type="button" onClick={() => void handleToggleReviewVisibility(review.id, !review.hidden)} className="rounded-lg bg-stone-100 px-3 py-2 text-xs font-bold text-stone-800 hover:bg-stone-200">
+                    {review.hidden ? 'Restaurar avaliação' : 'Ocultar avaliação'}
+                  </button>
+                  <button type="button" onClick={() => void handleRemoveReview(review.id)} className="rounded-lg bg-red-50 px-3 py-2 text-xs font-bold text-red-800 hover:bg-red-100">
+                    Excluir
+                  </button>
+                </div>
+              </article>
+            );
+          })}
         </div>
       )}
 

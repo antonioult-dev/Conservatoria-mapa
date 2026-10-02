@@ -31,7 +31,7 @@ export const OfflineIndicator: React.FC = () => {
     <div className="fixed top-14 left-4 right-4 z-50 max-w-md mx-auto p-2.5 rounded-2xl bg-amber-600/95 backdrop-blur-md text-white text-xs font-semibold shadow-lg flex items-center justify-between animate-in slide-in-from-top-2">
       <div className="flex items-center gap-2">
         <WifiOff className="w-4 h-4 text-amber-200 animate-pulse flex-shrink-0" />
-        <span>Você está sem conexão. Dados salvos e SOS continuam ativos.</span>
+        <span>Sem conexão: catálogo e ações online indisponíveis. A Central SOS pode ser aberta.</span>
       </div>
       <a
         href="tel:190"

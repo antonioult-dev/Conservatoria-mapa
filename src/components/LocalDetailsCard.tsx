@@ -14,6 +14,7 @@ import {
 import { Place, Review } from '../types';
 import { calculateDistance, formatDistance, getReviewSummary } from '../services/store';
 import { hasVerifiedCoordinates } from '../utils/location';
+import { PlaceImage } from './PlaceImage';
 
 interface LocalDetailsCardProps {
   place: Place;
@@ -21,6 +22,8 @@ interface LocalDetailsCardProps {
   userLocation: { lat: number; lng: number } | null;
   isFavorite: boolean;
   onToggleFavorite: (placeId: string) => void;
+  isAuthenticated: boolean;
+  onRequestLogin?: () => void;
   onOpenDetails: (place: Place) => void;
   onClose: () => void;
   isPlayingAudio: boolean;
@@ -33,6 +36,8 @@ export const LocalDetailsCard: React.FC<LocalDetailsCardProps> = ({
   userLocation,
   isFavorite,
   onToggleFavorite,
+  isAuthenticated,
+  onRequestLogin,
   onOpenDetails,
   onClose,
   isPlayingAudio,
@@ -83,12 +88,7 @@ export const LocalDetailsCard: React.FC<LocalDetailsCardProps> = ({
       <div className="flex flex-col sm:flex-row gap-3.5 items-start">
         {/* Thumbnail Image with Badges */}
         <div className="relative w-full sm:w-32 h-36 sm:h-32 rounded-2xl overflow-hidden flex-shrink-0 bg-stone-100 shadow-inner">
-          <img
-            src={place.imageUrl}
-            alt={place.name}
-            className="w-full h-full object-cover"
-            loading="lazy"
-          />
+          <PlaceImage src={place.imageUrl} alt={place.name} className="w-full h-full object-cover" />
           {place.verified ? (
             <span className="absolute top-2 left-2 px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-600/95 text-white shadow-xs">
               ✓ Verificado
@@ -120,7 +120,7 @@ export const LocalDetailsCard: React.FC<LocalDetailsCardProps> = ({
 
             {/* Favorite button */}
             <button
-              onClick={() => onToggleFavorite(place.id)}
+              onClick={() => isAuthenticated ? onToggleFavorite(place.id) : onRequestLogin?.()}
               aria-label={isFavorite ? 'Remover dos favoritos' : 'Salvar nos favoritos'}
               title={isFavorite ? 'Salvo nos favoritos' : 'Adicionar aos favoritos'}
               className="p-2 rounded-xl hover:bg-stone-100 text-stone-400 hover:text-red-500 transition active:scale-90 cursor-pointer flex-shrink-0"

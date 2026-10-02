@@ -3,19 +3,22 @@ import { Heart, Navigation, Trash2, ChevronRight, Compass } from 'lucide-react';
 import { useApp, calculateDistance, formatDistance } from '../services/store';
 import { Place } from '../types';
 import { hasVerifiedCoordinates } from '../utils/location';
+import { PlaceImage } from './PlaceImage';
 
 interface FavoritesScreenProps {
   onSelectPlace: (place: Place) => void;
   onNavigateToTab: (tab: 'inicio' | 'mapa') => void;
   onOpenDetails: (place: Place) => void;
+  onRequestLogin?: () => void;
 }
 
 export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({
   onSelectPlace,
   onNavigateToTab,
   onOpenDetails,
+  onRequestLogin,
 }) => {
-  const { places, favorites, toggleFavorite, userLocation } = useApp();
+  const { places, favorites, toggleFavorite, userLocation, currentUser } = useApp();
   const [filterCategory, setFilterCategory] = useState<string>('all');
 
   const favoritedPlaces = places.filter((p) => favorites.includes(p.id));
@@ -73,17 +76,26 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({
             <Heart className="w-7 h-7" />
           </div>
           <h3 className="text-base font-bold text-stone-900">
-            Nenhum favorito encontrado
+            {currentUser ? 'Nenhum favorito encontrado' : 'Entre para ver seus favoritos'}
           </h3>
           <p className="text-xs text-stone-500 max-w-xs mx-auto">
-            Navegue pelos pontos turísticos e toque no ícone de coração para salvar seus locais favoritos.
+            {currentUser
+              ? 'Navegue pelos pontos turísticos e toque no ícone de coração para salvar seus locais favoritos.'
+              : 'Entre com sua conta Google para salvar e acessar seus locais favoritos em todos os dispositivos.'}
           </p>
-          <button
-            onClick={() => onNavigateToTab('mapa')}
-            className="px-4 py-2.5 rounded-2xl bg-[#0d3822] text-white text-xs font-bold shadow-md hover:bg-[#124b2e] transition"
-          >
-            Explorar Mapa
-          </button>
+          <div className="flex justify-center gap-2">
+            {!currentUser && (
+              <button onClick={onRequestLogin} className="px-4 py-2.5 rounded-2xl bg-[#0d3822] text-white text-xs font-bold shadow-md hover:bg-[#124b2e] transition">
+                Entrar com Google
+              </button>
+            )}
+            <button
+              onClick={() => onNavigateToTab('mapa')}
+              className="px-4 py-2.5 rounded-2xl bg-stone-100 text-stone-800 text-xs font-bold hover:bg-stone-200 transition"
+            >
+              Explorar Mapa
+            </button>
+          </div>
         </div>
       ) : (
         <div className="space-y-3">
@@ -101,11 +113,7 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({
                   onClick={() => onOpenDetails(place)}
                   className="flex items-center gap-3 cursor-pointer flex-1 min-w-0"
                 >
-                  <img
-                    src={place.imageUrl}
-                    alt={place.name}
-                    className="w-16 h-16 rounded-xl object-cover flex-shrink-0"
-                  />
+                  <PlaceImage src={place.imageUrl} alt={place.name} className="w-16 h-16 rounded-xl object-cover flex-shrink-0" />
                   <div className="min-w-0">
                     <span className="text-[10px] font-bold text-[#0d3822] uppercase tracking-wider">
                       {place.categoryLabel || place.category}
@@ -132,7 +140,7 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({
                   </button>
 
                   <button
-                    onClick={() => toggleFavorite(place.id)}
+                    onClick={() => void toggleFavorite(place.id)}
                     title="Remover dos favoritos"
                     className="w-9 h-9 rounded-xl bg-stone-100 hover:bg-red-50 text-stone-400 hover:text-red-500 flex items-center justify-center transition active:scale-95"
                   >

@@ -70,9 +70,10 @@ service cloud.firestore {
         ? coordinatesValid(request.resource.data) && coordinateEvidenceValid(request.resource.data)
         : verifiedGoogleAccount()
           && request.resource.data.keys().hasAll(['id', 'name', 'type', 'merchantId', 'status', 'featured', 'verified', 'isSponsored', 'rating', 'reviewCount', 'createdAt'])
-          && request.resource.data.keys().hasOnly(['name', 'category', 'categoryLabel', 'type', 'description', 'shortDescription', 'imageUrl', 'gallery', 'address', 'hours', 'phone', 'whatsapp', 'instagram', 'website', 'featured', 'verified', 'badgeText', 'rating', 'reviewCount', 'status', 'merchantId', 'merchantName', 'createdAt', 'isSponsored', 'id'])
+          && request.resource.data.keys().hasOnly(['name', 'category', 'categoryLabel', 'type', 'description', 'shortDescription', 'imageUrl', 'gallery', 'address', 'hours', 'phone', 'whatsapp', 'email', 'instagram', 'website', 'featured', 'verified', 'badgeText', 'rating', 'reviewCount', 'status', 'merchantId', 'merchantName', 'createdAt', 'isSponsored', 'id'])
           && request.resource.data.id == placeId
           && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 120
+          && request.resource.data.category in ['historico', 'museus', 'pousadas', 'gastronomia', 'cachoeiras', 'eventos', 'comercio', 'servicos']
           && request.resource.data.type == 'business'
           && request.resource.data.merchantId == request.auth.uid
           && request.resource.data.status == 'PENDING_PAYMENT'
@@ -81,12 +82,32 @@ service cloud.firestore {
           && request.resource.data.isSponsored == false
           && request.resource.data.rating == 0
           && request.resource.data.reviewCount == 0
-          && request.resource.data.createdAt == request.time;
+          && request.resource.data.createdAt == request.time
+          && request.resource.data.description is string && request.resource.data.description.size() <= 4000
+          && request.resource.data.shortDescription is string && request.resource.data.shortDescription.size() <= 240
+          && request.resource.data.imageUrl is string && request.resource.data.imageUrl.size() <= 2048
+          && request.resource.data.gallery is list && request.resource.data.gallery.size() <= 10
+          && request.resource.data.address is string && request.resource.data.address.size() <= 300
+          && request.resource.data.hours is string && request.resource.data.hours.size() <= 300
+          && (!('email' in request.resource.data) || (request.resource.data.email is string && request.resource.data.email.size() <= 254))
+          && (!('phone' in request.resource.data) || (request.resource.data.phone is string && request.resource.data.phone.size() <= 40))
+          && (!('whatsapp' in request.resource.data) || (request.resource.data.whatsapp is string && request.resource.data.whatsapp.size() <= 40));
 
       allow update: if isAdmin() && coordinatesValid(request.resource.data) && coordinateEvidenceValid(request.resource.data)
         || (signedIn() && resource.data.merchantId == request.auth.uid && resource.data.status != 'BLOCKED'
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['description', 'shortDescription', 'imageUrl', 'gallery', 'address', 'hours', 'phone', 'whatsapp', 'instagram', 'website'])
-          && coordinatesValid(request.resource.data));
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['description', 'shortDescription', 'imageUrl', 'gallery', 'address', 'hours', 'phone', 'whatsapp', 'email', 'instagram', 'website'])
+          && coordinatesValid(request.resource.data)
+          && request.resource.data.description is string && request.resource.data.description.size() <= 4000
+          && (!('shortDescription' in request.resource.data) || (request.resource.data.shortDescription is string && request.resource.data.shortDescription.size() <= 240))
+          && (!('imageUrl' in request.resource.data) || (request.resource.data.imageUrl is string && request.resource.data.imageUrl.size() <= 2048))
+          && (!('gallery' in request.resource.data) || (request.resource.data.gallery is list && request.resource.data.gallery.size() <= 10))
+          && request.resource.data.address is string && request.resource.data.address.size() <= 300
+          && request.resource.data.hours is string && request.resource.data.hours.size() <= 300
+          && (!('phone' in request.resource.data) || (request.resource.data.phone is string && request.resource.data.phone.size() <= 40))
+          && (!('whatsapp' in request.resource.data) || (request.resource.data.whatsapp is string && request.resource.data.whatsapp.size() <= 40))
+          && (!('email' in request.resource.data) || (request.resource.data.email is string && request.resource.data.email.size() <= 254))
+          && (!('instagram' in request.resource.data) || (request.resource.data.instagram is string && request.resource.data.instagram.size() <= 80))
+          && (!('website' in request.resource.data) || (request.resource.data.website is string && request.resource.data.website.size() <= 2048)));
       allow delete: if isAdmin();
     }
 
@@ -107,10 +128,42 @@ service cloud.firestore {
         && request.resource.data.reviewsCount == 0
         && (!('featured' in request.resource.data) || request.resource.data.featured == false)
         && request.resource.data.id == guideId
-        && request.resource.data.keys().hasOnly(['id', 'name', 'cadastur', 'photoUrl', 'specialty', 'specialtyLabel', 'bio', 'experienceYears', 'languages', 'phone', 'whatsapp', 'email', 'rating', 'reviewsCount', 'pricePerPerson', 'duration', 'groupPrice', 'includedItems', 'itineraryHighlights', 'meetingPoint', 'availability', 'verified', 'featured', 'status', 'monthlySubscriptionPrice', 'merchantUserId']));
+          && request.resource.data.keys().hasAll(['id', 'name', 'cadastur', 'photoUrl', 'specialty', 'specialtyLabel', 'bio', 'experienceYears', 'languages', 'phone', 'whatsapp', 'email', 'rating', 'reviewsCount', 'pricePerPerson', 'duration', 'includedItems', 'itineraryHighlights', 'meetingPoint', 'availability', 'verified', 'status', 'monthlySubscriptionPrice', 'merchantUserId'])
+          && request.resource.data.keys().hasOnly(['id', 'name', 'cadastur', 'photoUrl', 'specialty', 'specialtyLabel', 'bio', 'experienceYears', 'languages', 'phone', 'whatsapp', 'email', 'rating', 'reviewsCount', 'pricePerPerson', 'duration', 'groupPrice', 'includedItems', 'itineraryHighlights', 'meetingPoint', 'availability', 'verified', 'featured', 'status', 'monthlySubscriptionPrice', 'merchantUserId'])
+          && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 120
+          && request.resource.data.cadastur is string && request.resource.data.cadastur.size() > 0 && request.resource.data.cadastur.size() <= 100
+          && request.resource.data.photoUrl is string && request.resource.data.photoUrl.size() <= 2048
+          && request.resource.data.specialty in ['seresta_historica', 'fazendas_cafe', 'ecoturismo_trilhas', 'gastronomia_cultural', 'roteiro_fotografico']
+          && request.resource.data.specialtyLabel is string && request.resource.data.specialtyLabel.size() <= 120
+          && request.resource.data.bio is string && request.resource.data.bio.size() > 0 && request.resource.data.bio.size() <= 4000
+          && request.resource.data.experienceYears is int && request.resource.data.experienceYears >= 0 && request.resource.data.experienceYears <= 80
+          && request.resource.data.languages is list && request.resource.data.languages.size() <= 10
+          && request.resource.data.phone is string && request.resource.data.phone.size() <= 40
+          && request.resource.data.whatsapp is string && request.resource.data.whatsapp.size() <= 40
+          && request.resource.data.email is string && request.resource.data.email.size() <= 254
+          && request.resource.data.pricePerPerson is number && request.resource.data.pricePerPerson > 0 && request.resource.data.pricePerPerson <= 100000
+          && request.resource.data.duration is string && request.resource.data.duration.size() <= 120
+          && request.resource.data.includedItems is list && request.resource.data.includedItems.size() <= 20
+          && request.resource.data.itineraryHighlights is list && request.resource.data.itineraryHighlights.size() <= 20
+          && request.resource.data.meetingPoint is string && request.resource.data.meetingPoint.size() <= 300
+          && request.resource.data.availability is string && request.resource.data.availability.size() <= 500);
       allow update: if isAdmin() || (signedIn() && resource.data.merchantUserId == request.auth.uid
         && resource.data.status != 'BLOCKED'
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'photoUrl', 'bio', 'phone', 'whatsapp', 'email', 'pricePerPerson', 'duration', 'includedItems', 'itineraryHighlights', 'meetingPoint', 'availability', 'languages', 'specialty', 'specialtyLabel', 'experienceYears']));
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'photoUrl', 'bio', 'phone', 'whatsapp', 'email', 'pricePerPerson', 'duration', 'includedItems', 'itineraryHighlights', 'meetingPoint', 'availability', 'languages', 'specialty', 'specialtyLabel', 'experienceYears'])
+        && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 120
+        && request.resource.data.bio is string && request.resource.data.bio.size() <= 4000
+        && request.resource.data.pricePerPerson is number && request.resource.data.pricePerPerson > 0 && request.resource.data.pricePerPerson <= 100000
+        && (!('photoUrl' in request.resource.data) || (request.resource.data.photoUrl is string && request.resource.data.photoUrl.size() <= 2048))
+        && (!('phone' in request.resource.data) || (request.resource.data.phone is string && request.resource.data.phone.size() <= 40))
+        && (!('whatsapp' in request.resource.data) || (request.resource.data.whatsapp is string && request.resource.data.whatsapp.size() <= 40))
+        && (!('email' in request.resource.data) || (request.resource.data.email is string && request.resource.data.email.size() <= 254))
+        && (!('duration' in request.resource.data) || (request.resource.data.duration is string && request.resource.data.duration.size() <= 120))
+        && (!('meetingPoint' in request.resource.data) || (request.resource.data.meetingPoint is string && request.resource.data.meetingPoint.size() <= 300))
+        && (!('availability' in request.resource.data) || (request.resource.data.availability is string && request.resource.data.availability.size() <= 500))
+        && (!('languages' in request.resource.data) || (request.resource.data.languages is list && request.resource.data.languages.size() <= 10))
+        && (!('includedItems' in request.resource.data) || (request.resource.data.includedItems is list && request.resource.data.includedItems.size() <= 20))
+        && (!('itineraryHighlights' in request.resource.data) || (request.resource.data.itineraryHighlights is list && request.resource.data.itineraryHighlights.size() <= 20))
+        && (!('experienceYears' in request.resource.data) || (request.resource.data.experienceYears is int && request.resource.data.experienceYears >= 0 && request.resource.data.experienceYears <= 80)));
       allow delete: if isAdmin();
     }
 

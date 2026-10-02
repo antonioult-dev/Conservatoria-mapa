@@ -3,6 +3,7 @@ import { X, MapPin, Navigation, Star, Search, Compass, AlertCircle } from 'lucid
 import { Place, Review } from '../types';
 import { calculateDistance, formatDistance, getReviewSummary } from '../services/store';
 import { hasVerifiedCoordinates } from '../utils/location';
+import { PlaceImage } from './PlaceImage';
 
 interface PlacesListDrawerProps {
   isOpen: boolean;
@@ -99,12 +100,7 @@ export const PlacesListDrawer: React.FC<PlacesListDrawerProps> = ({
                 >
                   {/* Thumbnail */}
                   <div className="w-20 h-20 rounded-xl overflow-hidden bg-stone-100 flex-shrink-0 shadow-inner relative">
-                    <img
-                      src={place.imageUrl}
-                      alt={place.name}
-                      className="w-full h-full object-cover"
-                      loading="lazy"
-                    />
+                    <PlaceImage src={place.imageUrl} alt={place.name} className="w-full h-full object-cover" />
                     {place.verified && (
                       <span className="absolute bottom-1 right-1 w-3 h-3 bg-emerald-500 rounded-full border border-white" title="Verificado" />
                     )}

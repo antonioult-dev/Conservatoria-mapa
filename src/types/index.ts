@@ -36,6 +36,7 @@ export interface Place {
   hours: string;
   phone?: string;
   whatsapp?: string;
+  email?: string;
   instagram?: string;
   website?: string;
   additionalInfo?: string;

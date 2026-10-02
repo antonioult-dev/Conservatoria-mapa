@@ -141,6 +141,7 @@ function MainLayout() {
                 onOpenChat={handleOpenChat}
                 onOpenGmailContact={() => setIsGmailModalOpen(true)}
                 onOpenLegal={handleOpenLegal}
+                onRequestLogin={() => setIsUserModalOpen(true)}
               />
             )}
 
@@ -148,6 +149,7 @@ function MainLayout() {
               <InteractiveMap
                 onOpenDetails={(place) => setDetailPlace(place)}
                 onOpenSearch={() => {}}
+                onRequestLogin={() => setIsUserModalOpen(true)}
               />
             )}
 
@@ -173,6 +175,7 @@ function MainLayout() {
                 }}
                 onNavigateToTab={(tab) => setActiveTab(tab)}
                 onOpenDetails={(place) => setDetailPlace(place)}
+                onRequestLogin={() => setIsUserModalOpen(true)}
               />
             )}
 
@@ -201,6 +204,7 @@ function MainLayout() {
           place={detailPlace}
           onClose={() => setDetailPlace(null)}
           onStartRoute={handleStartNavigationToPlace}
+          onRequestLogin={() => setIsUserModalOpen(true)}
         />
       )}
 

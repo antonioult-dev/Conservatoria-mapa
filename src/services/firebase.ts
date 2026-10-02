@@ -71,7 +71,18 @@ export async function requestAdminClaim(): Promise<void> {
     throw new Error('Não foi possível alcançar o servidor para validar a autorização administrativa.');
   }
   const result = await response.json().catch(() => ({})) as { error?: string };
-  if (!response.ok) throw new Error(result.error || 'Não foi possível validar a autorização administrativa.');
+  if (!response.ok) {
+    if (response.status === 403 && auth.currentUser) {
+      const token = await auth.currentUser.getIdTokenResult().catch(() => null);
+      if (token?.claims.admin === true) {
+        await fbSignOut(auth);
+        cachedAccessToken = null;
+      } else {
+        await auth.currentUser.getIdToken(true).catch(() => undefined);
+      }
+    }
+    throw new Error(result.error || 'Não foi possível validar a autorização administrativa.');
+  }
   await auth.currentUser.getIdToken(true);
 }
 

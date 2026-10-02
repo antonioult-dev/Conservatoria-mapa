@@ -20,24 +20,33 @@ export const UserModal: React.FC<UserModalProps> = ({
   const { currentUser, loginWithGoogle, logout } = useApp();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [msg, setMsg] = useState('');
+  const [hasError, setHasError] = useState(false);
 
   if (!isOpen) return null;
 
   const handleGoogleAuth = async (targetRole: 'TURISTA' | 'COMERCIANTE' = 'TURISTA') => {
     setIsSubmitting(true);
     setMsg('');
-    const res = await loginWithGoogle(targetRole);
-    setIsSubmitting(false);
-    if (res.success) {
-      setMsg(`Conectado via Google: ${res.user?.name}!`);
-      setTimeout(() => {
-        setMsg('');
-        onClose();
-        if (res.user?.role === 'SUPER_ADMIN') onOpenAdmin();
-        else if (targetRole === 'COMERCIANTE') onOpenMerchant();
-      }, 1000);
-    } else {
-      setMsg(res.error || 'Erro ao conectar com Google.');
+    setHasError(false);
+    try {
+      const res = await loginWithGoogle(targetRole);
+      if (res.success) {
+        setMsg(`Conectado via Google: ${res.user?.name}!`);
+        setTimeout(() => {
+          setMsg('');
+          onClose();
+          if (res.user?.role === 'SUPER_ADMIN') onOpenAdmin();
+          else if (targetRole === 'COMERCIANTE') onOpenMerchant();
+        }, 1000);
+      } else {
+        setHasError(true);
+        setMsg(res.error || 'Erro ao conectar com Google.');
+      }
+    } catch (error) {
+      setHasError(true);
+      setMsg(error instanceof Error ? error.message : 'Erro ao conectar com Google.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -128,7 +137,7 @@ export const UserModal: React.FC<UserModalProps> = ({
             </button>
 
             {msg && (
-              <div className="p-2 rounded-xl bg-emerald-100 text-emerald-800 text-xs font-bold text-center">
+              <div className={`p-2 rounded-xl text-xs font-bold text-center ${hasError ? 'bg-red-100 text-red-800' : 'bg-emerald-100 text-emerald-800'}`} role={hasError ? 'alert' : 'status'}>
                 {msg}
               </div>
             )}

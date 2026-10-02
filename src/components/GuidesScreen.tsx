@@ -28,6 +28,11 @@ import {
 import { useApp } from '../services/store';
 import { TourGuide, TourSpecialty } from '../types';
 
+const formatCurrency = (value: number) => new Intl.NumberFormat('pt-BR', {
+  style: 'currency',
+  currency: 'BRL',
+}).format(value);
+
 interface GuidesScreenProps {
   onOpenChatWithPrompt?: (prompt: string) => void;
 }
@@ -46,6 +51,7 @@ export const GuidesScreen: React.FC<GuidesScreenProps> = ({ onOpenChatWithPrompt
   const [bookingPeople, setBookingPeople] = useState('2');
   const [bookingNotes, setBookingNotes] = useState('');
   const [bookingSent, setBookingSent] = useState(false);
+  const [bookingError, setBookingError] = useState('');
 
   // Guide registration and subscription status
   const [isRegisterGuideOpen, setIsRegisterGuideOpen] = useState(false);
@@ -89,20 +95,26 @@ export const GuidesScreen: React.FC<GuidesScreenProps> = ({ onOpenChatWithPrompt
       customMsg ||
       `Olá ${guide.name}! Encontrei seu perfil no app Conservatória Turismo e gostaria de informações para agendar uma visita guiada com você.`;
     const url = `https://wa.me/${cleanNumber}?text=${encodeURIComponent(text)}`;
-    window.open(url, '_blank');
+    window.open(url, '_blank', 'noopener,noreferrer');
   };
 
   const handleConfirmBooking = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedGuide) return;
 
-    const totalEst = selectedGuide.pricePerPerson * parseInt(bookingPeople || '1');
+    const people = Number(bookingPeople);
+    if (!Number.isInteger(people) || people < 1 || people > 50) {
+      setBookingError('Informe uma quantidade de pessoas entre 1 e 50.');
+      return;
+    }
+    setBookingError('');
+    const totalEst = selectedGuide.pricePerPerson * people;
     const msg = `Olá ${selectedGuide.name}! Gostaria de agendar uma visita guiada em Conservatória:
 - Nome: ${bookingName}
 - Data pretendida: ${bookingDate || 'A combinar'}
 - Pessoas: ${bookingPeople}
 - Roteiro: ${selectedGuide.specialtyLabel}
-- Valor estimado: R$ ${totalEst},00
+- Valor estimado: ${formatCurrency(totalEst)}
 ${bookingNotes ? `- Observações: ${bookingNotes}` : ''}
 
 Você tem disponibilidade para esse dia?`;
@@ -500,6 +512,7 @@ Você tem disponibilidade para esse dia?`;
             </div>
 
             <form onSubmit={handleConfirmBooking} className="space-y-3">
+              {bookingError && <p role="alert" className="rounded-xl bg-red-50 p-3 text-xs text-red-800">{bookingError}</p>}
               <div>
                 <label className="block text-xs font-bold text-stone-700 mb-1">
                   Seu Nome Completo *
@@ -559,12 +572,12 @@ Você tem disponibilidade para esse dia?`;
               <div className="p-3 rounded-2xl bg-stone-50 border border-stone-200 text-xs text-stone-700 space-y-0.5">
                 <div className="flex items-center justify-between">
                   <span>Preço por pessoa:</span>
-                  <span className="font-bold">R$ {selectedGuide.pricePerPerson},00</span>
+                  <span className="font-bold">{formatCurrency(selectedGuide.pricePerPerson)}</span>
                 </div>
                 <div className="flex items-center justify-between text-sm font-black text-stone-900 pt-1 border-t border-stone-200">
                   <span>Total estimado:</span>
                   <span className="text-[#0d3822]">
-                    R$ {selectedGuide.pricePerPerson * parseInt(bookingPeople || '1')},00
+                    {formatCurrency(selectedGuide.pricePerPerson * (Number(bookingPeople) || 1))}
                   </span>
                 </div>
               </div>
@@ -700,6 +713,9 @@ Você tem disponibilidade para esse dia?`;
                     </label>
                     <input
                       type="number"
+                      min="0.01"
+                      max="100000"
+                      step="0.01"
                       required
                       value={regPrice}
                       onChange={(e) => setRegPrice(e.target.value)}

@@ -34,7 +34,7 @@ interface AppContextType {
   favorites: string[]; toggleFavorite: (placeId: string) => Promise<void>; isFavorite: (placeId: string) => boolean;
   userLocation: { lat: number; lng: number } | null; setUserLocation: (loc: { lat: number; lng: number } | null) => void; gpsAccuracy: number | null; setGpsAccuracy: (acc: number | null) => void; gpsActive: boolean; setGpsActive: (active: boolean) => void; gpsError: string | null; setGpsError: (error: string | null) => void; requestGpsPermission: (onSuccess?: (loc: { lat: number; lng: number }) => void, onError?: (err: string) => void) => void;
   selectedPlace: Place | null; setSelectedPlace: (place: Place | null) => void; activeRoute: TouristRoute | null; setActiveRoute: (route: TouristRoute | null) => void;
-  reviews: Review[]; addReview: (placeId: string, rating: number, comment: string, userName: string) => Promise<void>; deleteReview: (reviewId: string) => Promise<void>;
+  reviews: Review[]; addReview: (placeId: string, rating: number, comment: string, userName: string) => Promise<void>; setReviewHidden: (reviewId: string, hidden: boolean) => Promise<void>; deleteReview: (reviewId: string) => Promise<void>;
   reports: Report[]; addReport: (report: Omit<Report, 'id' | 'userId' | 'createdAt' | 'resolved'>) => Promise<void>; resolveReport: (reportId: string) => Promise<void>;
   payments: PaymentTransaction[]; settings: AppSettings; updateSettings: (newSettings: Partial<AppSettings>) => Promise<void>; connectionError: string | null;
 }
@@ -124,7 +124,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
 
     const reviewRef = collection(db, 'reviews');
-    unsubs.push(onSnapshot(isAdmin ? reviewRef : query(reviewRef, where('hidden', '==', false)), (snapshot) => { setReviews(docs<Review>(snapshot).filter((review) => !review.hidden)); clearError('reviews subscription'); }, (error) => reportError('reviews subscription', error)));
+    unsubs.push(onSnapshot(isAdmin ? reviewRef : query(reviewRef, where('hidden', '==', false)), (snapshot) => {
+      const loadedReviews = docs<Review>(snapshot);
+      setReviews(isAdmin ? loadedReviews : loadedReviews.filter((review) => !review.hidden));
+      clearError('reviews subscription');
+    }, (error) => reportError('reviews subscription', error)));
     unsubs.push(onSnapshot(doc(db, 'settings', 'public'), (snapshot) => { if (snapshot.exists()) setSettings({ ...INITIAL_SETTINGS, ...snapshot.data(), commercialPrice: 49.9 } as AppSettings); clearError('settings subscription'); }, (error) => reportError('settings subscription', error)));
     return () => unsubs.forEach((unsubscribe) => unsubscribe());
   }, [currentUser?.id, currentUser?.role]);
@@ -205,13 +209,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (!publicSettings.exists()) batch.set(doc(db, 'settings', 'public'), { ...INITIAL_SETTINGS, ...legacySettings, commercialPrice: 49.9 });
     const legacy = [
       ['conservatoria_places', 'places'], ['conservatoria_routes', 'routes'], ['conservatoria_guides', 'guides'],
-      ['conservatoria_reviews', 'reviews'], ['conservatoria_reports', 'reports'],
+      ['conservatoria_reviews', 'reviews'],
     ] as const;
     for (const [key, collectionName] of legacy) {
       try {
         const records = JSON.parse(localStorage.getItem(key) || '[]') as Array<Record<string, unknown>>;
         for (const record of records) {
-          if (typeof record.id !== 'string' || writes >= 400) continue;
+          if (typeof record.id !== 'string' || record.id.length > 1500 || record.id.includes('/') || writes >= 400) continue;
           const { latitude: _latitude, longitude: _longitude, coordinatesVerified: _coordinatesVerified, coordinateSourceUrl: _coordinateSourceUrl, role: _role, ...untrusted } = record;
           const { merchantId: _merchantId, merchantName: _merchantName, merchantUserId: _merchantUserId, userId: _userId, ...withoutClientOwnership } = untrusted;
           const { geometry: _geometry, polyline: _polyline, waypoints: _waypoints, distance: _distance, distanceMeters: _distanceMeters, distanceKm: _distanceKm, coordinates: _coordinates, path: _path, ...routeSafe } = withoutClientOwnership;
@@ -221,7 +225,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
               ? { ...withoutClientOwnership, status: 'PENDING_APPROVAL', verified: false, featured: false, rating: 0, reviewsCount: 0, monthlySubscriptionPrice: 49.9 }
               : collectionName === 'routes' ? { ...routeSafe, published: false, durationEstimate: 'Não informado' }
               : collectionName === 'reviews' ? null : withoutClientOwnership;
-          if (safe) batch.set(doc(db, collectionName, record.id), safe, { merge: true });
+          if (!safe) continue;
+          batch.set(doc(db, collectionName, record.id), safe, { merge: true });
           writes += 1;
         }
       } catch (error) { reportError(`legacy ${key} migration`, error); }
@@ -229,7 +234,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     batch.set(migration, { migratedBy: auth.currentUser.uid, completedAt: serverTimestamp(), writes });
     await batch.commit();
     // Legacy values have no trustworthy ownership mapping. Keep the source keys so
-    // skipped records (including reviews, users, favorites, and batches over 400)
+    // skipped records (including reviews, reports, users, favorites, and batches over 400)
     // remain available for a reviewed import instead of silently deleting data.
   }
 
@@ -257,8 +262,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const token = await result.user.getIdTokenResult(true);
       if (targetRole === 'SUPER_ADMIN' && token.claims.admin !== true) return { success: false, error: 'Esta conta não possui autorização administrativa.' };
       const profileRef = doc(db, 'users', result.user.uid);
-      if (!(await getDoc(profileRef)).exists()) await setDoc(profileRef, { name: result.user.displayName || '', email: result.user.email || '', phone: result.user.phoneNumber || '', createdAt: serverTimestamp() });
-      const user: User = { id: result.user.uid, name: result.user.displayName || result.user.email?.split('@')[0] || 'Usuário', email: result.user.email || '', phone: result.user.phoneNumber || '', role: token.claims.admin === true ? 'SUPER_ADMIN' : targetRole === 'COMERCIANTE' ? 'COMERCIANTE' : 'TURISTA', createdAt: result.user.metadata.creationTime || new Date().toISOString() };
+      let profile = await getDoc(profileRef);
+      if (!profile.exists()) {
+        await setDoc(profileRef, { name: result.user.displayName || '', email: result.user.email || '', phone: result.user.phoneNumber || '', createdAt: serverTimestamp() });
+        profile = await getDoc(profileRef);
+      }
+      const merchantSnapshot = await getDocs(query(collection(db, 'places'), where('merchantId', '==', result.user.uid)));
+      const business = merchantSnapshot.docs.find((item) => item.data().status !== 'BLOCKED');
+      const profileData = profile.data();
+      const role: User['role'] = token.claims.admin === true
+        ? 'SUPER_ADMIN'
+        : business ? 'COMERCIANTE' : targetRole === 'COMERCIANTE' ? 'COMERCIANTE' : 'TURISTA';
+      const user: User = {
+        id: result.user.uid,
+        name: profileData?.name || result.user.displayName || result.user.email?.split('@')[0] || 'Usuário',
+        email: result.user.email || '',
+        phone: profileData?.phone || result.user.phoneNumber || '',
+        role,
+        createdAt: profileData?.createdAt?.toDate?.().toISOString?.() || result.user.metadata.creationTime || new Date().toISOString(),
+        ...(business ? { merchantBusinessId: business.id } : {}),
+      };
       setCurrentUser(user);
       return { success: true, user };
     } catch (error) { return { success: false, error: error instanceof Error ? error.message : 'Falha na autenticação.' }; }
@@ -266,16 +289,47 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const registerMerchant = async (data: { name: string; email: string; businessName: string; phone: string; whatsapp: string; category: Place['category'] }): Promise<User> => {
     if (!auth.currentUser) throw new Error('Autentique-se com o Google antes de cadastrar seu negócio.');
+    const name = data.name.trim();
+    const businessName = data.businessName.trim();
+    const email = data.email.trim();
+    const phone = data.phone.trim();
+    const whatsapp = data.whatsapp.trim();
+    if (!name || name.length > 120 || !businessName || businessName.length > 120) {
+      throw new Error('Informe nomes válidos com até 120 caracteres.');
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) {
+      throw new Error('Informe um e-mail comercial válido.');
+    }
+    if (phone.length > 30 || whatsapp.length > 40) {
+      throw new Error('Confira os telefones informados.');
+    }
+    const ownerId = auth.currentUser.uid;
+    const existingBusinesses = await getDocs(query(collection(db, 'places'), where('merchantId', '==', ownerId)));
+    const existingBusiness = existingBusinesses.docs.find((item) => item.data().status !== 'BLOCKED');
+    if (existingBusiness) throw new Error('Esta conta já possui um negócio cadastrado. Entre no painel para editar os dados existentes.');
+
     const businessId = doc(collection(db, 'places')).id;
-    const merchantUser: User = { id: auth.currentUser.uid, name: data.name, email: auth.currentUser.email || data.email, role: 'COMERCIANTE', phone: data.phone, whatsapp: data.whatsapp, merchantBusinessId: businessId, createdAt: new Date().toISOString() };
+    const merchantUser: User = { id: ownerId, name, email: auth.currentUser.email || email, role: 'COMERCIANTE', phone, whatsapp, merchantBusinessId: businessId, createdAt: new Date().toISOString() };
     const business = {
-      id: businessId, name: data.businessName, category: data.category, categoryLabel: data.category, type: 'business',
-      description: 'Estabelecimento recém-cadastrado no Guia Comercial de Conservatória.', shortDescription: `${data.businessName} em Conservatória`,
-      imageUrl: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=900&q=80', gallery: [], address: '', hours: '', phone: data.phone, whatsapp: data.whatsapp,
-      featured: false, verified: false, badgeText: 'COMÉRCIO', rating: 0, reviewCount: 0, status: 'PENDING_PAYMENT', merchantId: auth.currentUser.uid, merchantName: data.name, createdAt: serverTimestamp(), isSponsored: false,
+      id: businessId, name: businessName, category: data.category, categoryLabel: data.category, type: 'business',
+      description: '', shortDescription: '', imageUrl: '', gallery: [], address: '', hours: '', phone, whatsapp, email,
+      featured: false, verified: false, badgeText: 'COMÉRCIO', rating: 0, reviewCount: 0, status: 'PENDING_PAYMENT', merchantId: ownerId, merchantName: name, createdAt: serverTimestamp(), isSponsored: false,
     };
-    await setDoc(doc(db, 'places', businessId), business);
-    await updateDoc(doc(db, 'users', auth.currentUser.uid), { name: data.name, phone: data.phone });
+    const userRef = doc(db, 'users', ownerId);
+    const profile = await getDoc(userRef);
+    const batch = writeBatch(db);
+    batch.set(doc(db, 'places', businessId), business);
+    if (profile.exists()) {
+      batch.update(userRef, { name, phone });
+    } else {
+      batch.set(userRef, {
+        name,
+        email: auth.currentUser.email || '',
+        phone,
+        createdAt: serverTimestamp(),
+      });
+    }
+    await batch.commit();
     setCurrentUser(merchantUser);
     return merchantUser;
   };
@@ -307,6 +361,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const id = doc(collection(db, 'reviews')).id;
     await setDoc(doc(db, 'reviews', id), { placeId, userId: auth.currentUser.uid, userName: userName.trim() || auth.currentUser.displayName || 'Turista', rating, comment: comment.trim(), createdAt: serverTimestamp(), hidden: false });
   };
+  const setReviewHidden = async (id: string, hidden: boolean) => updateDoc(doc(db, 'reviews', id), { hidden });
   const deleteReview = async (id: string) => deleteDoc(doc(db, 'reviews', id));
   const addReport = async (report: Omit<Report, 'id' | 'userId' | 'createdAt' | 'resolved'>) => {
     if (!auth.currentUser) throw new Error('Entre na sua conta para enviar uma denúncia.');
@@ -315,7 +370,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const resolveReport = async (id: string) => updateDoc(doc(db, 'reports', id), { resolved: true });
   const updateSettings = async (updates: Partial<AppSettings>) => setDoc(doc(db, 'settings', 'public'), { ...updates, commercialPrice: 49.9 }, { merge: true });
 
-  return <AppContext.Provider value={{ places, addPlace, updatePlace, deletePlace, updateBusinessStatus, routes, addRoute, updateRoute, deleteRoute, guides, addGuide, updateGuide, deleteGuide, updateGuideStatus, currentUser, loginWithGoogle, logout, registerMerchant, favorites, toggleFavorite, isFavorite, userLocation, setUserLocation, gpsAccuracy, setGpsAccuracy, gpsActive, setGpsActive, gpsError, setGpsError, requestGpsPermission, selectedPlace, setSelectedPlace, activeRoute, setActiveRoute, reviews, addReview, deleteReview, reports, addReport, resolveReport, payments, settings, updateSettings, connectionError }}>{children}</AppContext.Provider>;
+  return <AppContext.Provider value={{ places, addPlace, updatePlace, deletePlace, updateBusinessStatus, routes, addRoute, updateRoute, deleteRoute, guides, addGuide, updateGuide, deleteGuide, updateGuideStatus, currentUser, loginWithGoogle, logout, registerMerchant, favorites, toggleFavorite, isFavorite, userLocation, setUserLocation, gpsAccuracy, setGpsAccuracy, gpsActive, setGpsActive, gpsError, setGpsError, requestGpsPermission, selectedPlace, setSelectedPlace, activeRoute, setActiveRoute, reviews, addReview, setReviewHidden, deleteReview, reports, addReport, resolveReport, payments, settings, updateSettings, connectionError }}>{children}</AppContext.Provider>;
 }
 
 export function useApp() { const context = useContext(AppContext); if (!context) throw new Error('useApp must be used within an AppProvider'); return context; }

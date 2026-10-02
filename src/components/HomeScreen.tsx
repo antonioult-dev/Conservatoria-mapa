@@ -26,6 +26,7 @@ import { hasVerifiedCoordinates } from '../utils/location';
 import { Place, TouristRoute, PlaceCategory } from '../types';
 import { toggleSerestaAudio } from '../services/audioService';
 import { FAQSection } from './FAQSection';
+import { PlaceImage } from './PlaceImage';
 
 interface HomeScreenProps {
   onSelectPlace: (place: Place) => void;
@@ -37,6 +38,7 @@ interface HomeScreenProps {
   onOpenChat?: (prompt?: string) => void;
   onOpenGmailContact?: () => void;
   onOpenLegal?: (tab?: 'terms' | 'privacy') => void;
+  onRequestLogin?: () => void;
 }
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({
@@ -49,6 +51,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onOpenChat,
   onOpenGmailContact,
   onOpenLegal,
+  onRequestLogin,
 }) => {
   const {
     places,
@@ -57,6 +60,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     userLocation,
     gpsActive,
     settings,
+    currentUser,
     isFavorite,
     toggleFavorite,
   } = useApp();
@@ -274,7 +278,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 className="flex items-center justify-between p-2 rounded-xl hover:bg-stone-50 cursor-pointer"
               >
                 <div className="flex items-center gap-2.5">
-                  <img src={res.imageUrl} alt={res.name} className="w-10 h-10 rounded-lg object-cover" />
+                  <PlaceImage src={res.imageUrl} alt={res.name} className="w-10 h-10 rounded-lg object-cover" />
                   <div>
                     <div className="text-xs font-bold text-stone-900">{res.name}</div>
                     <div className="text-[11px] text-stone-500">{res.categoryLabel || res.category}</div>
@@ -462,11 +466,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 <div>
                   {/* Image container */}
                   <div className="relative h-32 w-full bg-stone-100 overflow-hidden">
-                    <img
-                      src={place.imageUrl}
-                      alt={place.name}
-                      className="w-full h-full object-cover"
-                    />
+                    <PlaceImage src={place.imageUrl} alt={place.name} className="w-full h-full object-cover" />
 
                     {/* Badge top-left */}
                     <div className="absolute top-2 left-2 bg-stone-900/80 backdrop-blur-sm text-white text-[9px] font-black px-2 py-0.5 rounded-full flex items-center gap-1">
@@ -478,7 +478,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        toggleFavorite(place.id);
+                        if (!currentUser) onRequestLogin?.();
+                        else void toggleFavorite(place.id);
                       }}
                       className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center text-white hover:text-red-500 active:scale-90 transition"
                       aria-label="Favoritar"
