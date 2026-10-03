@@ -3,9 +3,7 @@ import path from 'path';
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
-import { GoogleGenAI } from '@google/genai';
-import { cert, getApps, initializeApp } from 'firebase-admin/app';
-import { getAuth } from 'firebase-admin/auth';
+import type { Auth } from 'firebase-admin/auth';
 
 dotenv.config();
 
@@ -34,24 +32,33 @@ app.use((_req, res, next) => {
 
 app.use(express.json({ limit: '64kb' }));
 
-function getAdminAuth() {
-  const serializedCredentials = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
-  if (!serializedCredentials) return null;
-  try {
-    const credentials = JSON.parse(serializedCredentials) as { project_id?: string; client_email?: string; private_key?: string };
-    if (!credentials.project_id || !credentials.client_email || !credentials.private_key) return null;
-    const adminApp = getApps().find((candidate) => candidate.name === 'conservatoria-admin') || initializeApp({
-      credential: cert({ projectId: credentials.project_id, clientEmail: credentials.client_email, privateKey: credentials.private_key.replace(/\\n/g, '\n') }),
-    }, 'conservatoria-admin');
-    return getAuth(adminApp);
-  } catch {
-    console.error('[config] FIREBASE_SERVICE_ACCOUNT_JSON inválido; autorização administrativa indisponível.');
-    return null;
-  }
+let adminAuthPromise: Promise<Auth | null> | undefined;
+
+function getAdminAuth(): Promise<Auth | null> {
+  if (adminAuthPromise) return adminAuthPromise;
+  adminAuthPromise = (async () => {
+    const serializedCredentials = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+    if (!serializedCredentials) return null;
+    try {
+      const credentials = JSON.parse(serializedCredentials) as { project_id?: string; client_email?: string; private_key?: string };
+      if (!credentials.project_id || !credentials.client_email || !credentials.private_key) return null;
+      const [{ cert, getApps, initializeApp }, { getAuth }] = await Promise.all([
+        import('firebase-admin/app'),
+        import('firebase-admin/auth'),
+      ]);
+      const adminApp = getApps().find((candidate) => candidate.name === 'conservatoria-admin') || initializeApp({
+        credential: cert({ projectId: credentials.project_id, clientEmail: credentials.client_email, privateKey: credentials.private_key.replace(/\\n/g, '\n') }),
+      }, 'conservatoria-admin');
+      return getAuth(adminApp);
+    } catch {
+      console.error('[config] FIREBASE_SERVICE_ACCOUNT_JSON inválido; autorização administrativa indisponível.');
+      return null;
+    }
+  })();
+  return adminAuthPromise;
 }
 
-const serverAdminAuth = getAdminAuth();
-if (!serverAdminAuth || !process.env.ADMIN_EMAILS?.split(',').some((email) => email.trim())) {
+if (!process.env.FIREBASE_SERVICE_ACCOUNT_JSON || !process.env.ADMIN_EMAILS?.split(',').some((email) => email.trim())) {
   console.warn('[config] Configure FIREBASE_SERVICE_ACCOUNT_JSON válido e ADMIN_EMAILS para habilitar o painel administrativo.');
 }
 
@@ -73,7 +80,7 @@ function isWithinRateLimit(key: string, maxRequests: number, windowMs: number): 
 }
 
 app.post('/api/auth/admin-claim', async (req, res) => {
-  const adminAuth = serverAdminAuth;
+  const adminAuth = await getAdminAuth();
   if (!adminAuth) {
     return res.status(503).json({ error: 'Administração não configurada. O servidor precisa de FIREBASE_SERVICE_ACCOUNT_JSON válido e ADMIN_EMAILS.' });
   }
@@ -147,6 +154,7 @@ app.post('/api/chat', async (req, res) => {
     const grounding = ['search', 'maps', 'none'].includes(groundingMode) ? groundingMode : null;
     if (!grounding) return res.status(400).json({ error: 'Modo de pesquisa inválido.' });
     if (!process.env.GEMINI_API_KEY) return res.status(503).json({ error: 'Serviço de IA não configurado. Configure GEMINI_API_KEY no servidor.' });
+    const { GoogleGenAI } = await import('@google/genai');
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
     // Formata o histórico multi-turn
