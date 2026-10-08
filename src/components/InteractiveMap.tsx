@@ -220,7 +220,9 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     if (!container) return;
 
     let resizeObserver: ResizeObserver | null = null;
-    let t1: any, t2: any, t3: any;
+    let t1: ReturnType<typeof setTimeout> | undefined;
+    let t2: ReturnType<typeof setTimeout> | undefined;
+    let t3: ReturnType<typeof setTimeout> | undefined;
 
     try {
       if (!initialMapCenter) {
@@ -233,8 +235,8 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         mapInstanceRef.current.remove();
         mapInstanceRef.current = null;
       }
-      if ((container as any)._leaflet_id) {
-        delete (container as any)._leaflet_id;
+      if ('_leaflet_id' in container) {
+        delete (container as HTMLElement & { _leaflet_id?: unknown })._leaflet_id;
       }
 
       const map = L.map(container, {
@@ -278,15 +280,15 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         });
         resizeObserver.observe(container);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Erro ao inicializar mapa Leaflet:', err);
       setMapError('Não foi possível carregar o mapa. Tente novamente.');
     }
 
     return () => {
-      clearTimeout(t1);
-      clearTimeout(t2);
-      clearTimeout(t3);
+      if (t1) clearTimeout(t1);
+      if (t2) clearTimeout(t2);
+      if (t3) clearTimeout(t3);
       if (resizeObserver) {
         resizeObserver.disconnect();
       }
@@ -294,8 +296,8 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         mapInstanceRef.current.remove();
         mapInstanceRef.current = null;
       }
-      if (container) {
-        delete (container as any)._leaflet_id;
+      if (container && '_leaflet_id' in container) {
+        delete (container as HTMLElement & { _leaflet_id?: unknown })._leaflet_id;
       }
     };
   }, [initialMapCenter?.[0], initialMapCenter?.[1]]);
@@ -556,15 +558,15 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     if (!document.fullscreenElement) {
       if (elem.requestFullscreen) {
         elem.requestFullscreen();
-      } else if ((elem as any).webkitRequestFullscreen) {
-        (elem as any).webkitRequestFullscreen();
+      } else if ('webkitRequestFullscreen' in elem && typeof (elem as HTMLElement & { webkitRequestFullscreen: () => void }).webkitRequestFullscreen === 'function') {
+        (elem as HTMLElement & { webkitRequestFullscreen: () => void }).webkitRequestFullscreen();
       }
       setIsFullscreen(true);
     } else {
       if (document.exitFullscreen) {
         document.exitFullscreen();
-      } else if ((document as any).webkitExitFullscreen) {
-        (document as any).webkitExitFullscreen();
+      } else if ('webkitExitFullscreen' in document && typeof (document as Document & { webkitExitFullscreen: () => void }).webkitExitFullscreen === 'function') {
+        (document as Document & { webkitExitFullscreen: () => void }).webkitExitFullscreen();
       }
       setIsFullscreen(false);
     }
